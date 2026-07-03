@@ -184,12 +184,10 @@ if (latestDate <= now) {
           maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
         case '11월': {
-          // 가장자리(코너)부터 아주 조금씩 안쪽으로 밝아지게 함.
-          // reveal: 진행률 0→100 에 따라 0→100. 지수(2.4)가 클수록 초반이 더 느림.
-          const reveal = Math.pow(percent / 100, 2.4) * 100;
-          // boundary: '밝음이 시작되는 반경'. 진행 초반엔 99~100%라 코너 끝만 살짝 밝음.
-          const boundary = 100 - reveal;
-          const soft = 4; // 어둠→밝음 전환 폭(작을수록 경계가 또렷)
+          // 진행률만큼 '밝음 경계'가 바깥→안쪽으로 선형 이동.
+          // 매일 쌓이는 체크만큼 경계가 일정하게 조금씩 들어옴.
+          const boundary = 100 - Number(percent); // 진행 0→100%, 경계 100→0%
+          const soft = 4; // 어둠→밝음 전환 폭
           const inner = Math.max(boundary - soft, 0);
 
           maskValue =
