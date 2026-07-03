@@ -90,7 +90,7 @@ const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
     if (!groupId) return;
 
     try {
-      // 1. 서버에 상태 변경 요청 (await로 완료될 때까지 대기)
+      // 1. 서버에 체크 상태 변경 요청
       const response = await fetch(`/api/tongdok?groupId=${groupId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -102,12 +102,11 @@ const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
       });
 
       if (response.ok) {
-        // 2. 서버가 성공했을 때만 최신 데이터를 불러와 화면 갱신
-        // 기존의 '미리 업데이트(Optimistic Update)'를 지워 데이터 꼬임을 방지합니다.
+        // 2. 서버 응답이 성공한 경우에만 fetchData를 호출하여 데이터 동기화
         await fetchData(groupId);
         await fetchGlobalProgress();
       } else {
-        alert("체크 상태 저장에 실패했습니다. 다시 시도해 주세요.");
+        alert("저장에 실패했습니다.");
       }
     } catch (err) {
       console.error("체크박스 통신 오류:", err);
@@ -173,7 +172,7 @@ const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
           maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
         case '11월':
-           cconst edgeProgress = percent * 0.3;
+           const edgeProgress = percent * 0.3;
 
   maskValue =
     `radial-gradient(
