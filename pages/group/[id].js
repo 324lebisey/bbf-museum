@@ -171,9 +171,13 @@ if (latestDate <= now) {
       maskValue = 'radial-gradient(circle at 50% 68%, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
     } else {
       switch(currentMonth) {
-        case '7월':
-          maskValue = 'radial-gradient(circle at 42% 48%, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
+        case '7월': {
+          // 맞닿은 손끝(42% 48%)에서 아주 작게 시작 → 진행률만큼 선형으로 커짐
+          const jCore = Number(percent);   // 완전 밝은 반경 (진행률 1:1, 매일 변화 보임)
+          const jEdge = jCore + 5;         // 페이드 폭. 작을수록 시작 원이 더 조여짐
+          maskValue = 'radial-gradient(circle at 42% 48%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
           break;
+        }
         case '8월':
           maskValue = 'radial-gradient(circle at 25% 75%, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
