@@ -25,6 +25,7 @@ if (global === 'true') {
 
     // 2. 데이터 불러오기 (GET)
     // pages/api/tongdok.js 의 GET 부분 (전체 교체)
+// pages/api/tongdok.js 의 GET 부분 (전체 교체)
 if (req.method === 'GET') {
   // 🛠️ 명단은 id(등록순)로, 로그는 날짜순으로 강제 정렬하여 보내줍니다.
   const members = await sql`
