@@ -171,8 +171,7 @@ const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
           maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
         case '11월':
-          const edgeProgress = percent * 1.2; 
-  maskValue = 'radial-gradient(circle at 50% 50%, rgba(0,0,0,0) ' + edgeProgress + '%, rgba(0,0,0,1) ' + (edgeProgress + 20) + '%)';
+           maskValue = 'radial-gradient(circle at 50% 50%, rgba(0,0,0,0) ' + edgeProgress + '%, rgba(0,0,0,1) ' + (edgeProgress + 20) + '%)';
   break;
         default:
           maskValue = 'radial-gradient(circle at 50% 50%, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
