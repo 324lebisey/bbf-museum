@@ -27,17 +27,36 @@ export default function GroupDashboard() {
   const [members, setMembers] = useState([]);
   const [logs, setLogs] = useState([]);
   const [allGroupsLogsCount, setAllGroupsLogsCount] = useState(0);
-
+  const [totalPeople, setTotalPeople] = useState(0);   // 🆕 현재 등록 인원(분모)
   // 🛠️ [패치] 주소창의 조 번호를 명확하게 인지할 때까지 감시하고 정해지면 데이터를 불러옵니다.
-  const groupId = queryId; 
+const groupId = queryId; 
+
+  // 현재 탭·월에 맞는 global 조회용 월 파라미터 (150일 대장정이면 null → 전체 집계)
+  const currentMonthParam = () =>
+    activeTab === '150일 대장정' ? null : '2026-' + currentMonth.replace('월', '').padStart(2, '0');
 
   useEffect(() => {
     if (groupId) {
       setSelectedGroupToggle(groupId);
       fetchData(groupId);
-      fetchGlobalProgress();
     }
   }, [groupId]);
+
+  // 최초 로드 + 탭 전환 + 월 전환 시, 전체 진도율을 해당 월 기준으로 다시 집계
+  useEffect(() => {
+    if (groupId) fetchGlobalProgress(currentMonthParam());
+  }, [groupId, activeTab, currentMonth]);
+
+  // 창으로 돌아올 때(그새 다른 조가 체크했을 수 있으니) 최신화
+  useEffect(() => {
+    const onFocus = () => {
+      if (!groupId) return;
+      fetchGlobalProgress(currentMonthParam());
+      fetchData(groupId);
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [groupId, activeTab, currentMonth]);
 
 const fetchData = async (targetGroupId) => {
     if (!targetGroupId) return;
@@ -52,12 +71,12 @@ const fetchData = async (targetGroupId) => {
 const [totalPeople, setTotalPeople] = useState(0);
 
 const fetchGlobalProgress = async (month) => {
-  const q = month ? `&month=${month}` : '';
-  const res = await fetch(`/api/tongdok?global=true${q}&_cb=${Date.now()}`);
-  const result = await res.json();
-  setAllGroupsLogsCount(result.globalCount || 0);
-  setTotalPeople(result.totalPeople || 0);
-};
+    const q = month ? `&month=${month}` : '';
+    const res = await fetch(`/api/tongdok?global=true${q}&_cb=${Date.now()}`);
+    const result = await res.json();
+    setAllGroupsLogsCount(result.globalCount || 0);
+    setTotalPeople(result.totalPeople || 0);
+  };
 
   const handleRegisterMembers = async () => {
     // 🛠️ [패치] 조 번호(groupId)가 비어있거나 인식이 안 되었으면 즉시 중단합니다.
@@ -81,7 +100,7 @@ const fetchGlobalProgress = async (month) => {
     if (response.ok) {
       alert('명단이 성공적으로 저장되었습니다!');
       await fetchData(groupId);
-      await fetchGlobalProgress();
+      await fetchGlobalProgress(currentMonthParam()); 
     } else {
       // 🛠️ [패치] 실패 시 백엔드가 준 구체적인 에러 메시지를 띄우도록 보완합니다.
       const errData = await response.json();
@@ -107,7 +126,7 @@ const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
       if (response.ok) {
         // 2. 서버 응답이 성공한 경우에만 fetchData를 호출하여 데이터 동기화
         await fetchData(groupId);
-        await fetchGlobalProgress();
+        await fetchGlobalProgress(currentMonthParam());
       } else {
         alert("저장에 실패했습니다.");
       }
@@ -158,9 +177,11 @@ if (latestDate <= now) {
   if (activeTab === '우리 조 작품') {
     progressPercent = groupTargetGoal > 0 ? ((groupCurrentChecked / groupTargetGoal) * 100) : 0;
   } else if (activeTab === '이달의 명화 전시관') {
-    progressPercent = (allGroupsLogsCount / (totalPeople * targetDays)) * 100;
+    const goal = totalPeople * targetDays;
+    progressPercent = goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
   } else {
-    progressPercent = (allGroupsLogsCount / (totalPeople * TOTAL_150_DAYS)) * 100;
+    const goal = totalPeople * TOTAL_150_DAYS;
+    progressPercent = goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
   }
   progressPercent = Math.min(Number(progressPercent), 100).toFixed(1);
 
