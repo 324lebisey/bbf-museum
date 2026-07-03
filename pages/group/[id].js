@@ -123,9 +123,21 @@ const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
     const memberLogs = logs.filter(l => l.member_name === m.name);
     let isInactive = false;
     if (memberLogs.length > 0) {
-      const latestDate = new Date(Math.max(...memberLogs.map(l => new Date(l.check_date))));
-      const diffDays = Math.ceil(Math.abs(new Date() - latestDate) / (1000 * 60 * 60 * 24));
-      if (diffDays > 5) isInactive = true;
+      const latestDate = new Date(
+  Math.max(...memberLogs.map(l => new Date(l.check_date)))
+);
+
+const now = new Date();
+
+if (latestDate <= now) {
+  const diffDays = Math.ceil(
+    (now - latestDate) / (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays > 5) {
+    isInactive = true;
+  }
+}
     } else {
       isInactive = true;
     }
