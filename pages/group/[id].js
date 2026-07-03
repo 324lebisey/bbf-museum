@@ -183,21 +183,23 @@ if (latestDate <= now) {
         case '10월':
           maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
-        case '11월':
-  // 진행률을 강하게 압축 (초반엔 거의 안 보임)
-  const edgeProgress = Math.pow(percent / 100, 3) * 12;
+        case '11월': {
+          // 가장자리(코너)부터 아주 조금씩 안쪽으로 밝아지게 함.
+          // reveal: 진행률 0→100 에 따라 0→100. 지수(2.4)가 클수록 초반이 더 느림.
+          const reveal = Math.pow(percent / 100, 2.4) * 100;
+          // boundary: '밝음이 시작되는 반경'. 진행 초반엔 99~100%라 코너 끝만 살짝 밝음.
+          const boundary = 100 - reveal;
+          const soft = 4; // 어둠→밝음 전환 폭(작을수록 경계가 또렷)
+          const inner = Math.max(boundary - soft, 0);
 
-  maskValue =
-    'radial-gradient(' +
-    'circle at 50% 50%, ' +
-    'rgba(0,0,0,0) ' + edgeProgress + '%, ' +
-    'rgba(0,0,0,0.02) ' + (edgeProgress + 1) + '%, ' +
-    'rgba(0,0,0,0.08) ' + (edgeProgress + 2) + '%, ' +
-    'rgba(0,0,0,0.25) ' + (edgeProgress + 4) + '%, ' +
-    'rgba(0,0,0,0.60) ' + (edgeProgress + 8) + '%, ' +
-    'rgba(0,0,0,1) 100%' +
-    ')';
-  break;
+          maskValue =
+            'radial-gradient(circle at 50% 50%, ' +
+            'rgba(0,0,0,0) 0%, ' +
+            'rgba(0,0,0,0) ' + inner + '%, ' +
+            'rgba(0,0,0,1) ' + boundary + '%, ' +
+            'rgba(0,0,0,1) 100%)';
+          break;
+        }
         default:
           maskValue = 'radial-gradient(circle at 50% 50%, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
       }
