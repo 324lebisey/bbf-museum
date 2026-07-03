@@ -27,14 +27,15 @@ export default function GroupDashboard() {
   const [members, setMembers] = useState([]);
   const [logs, setLogs] = useState([]);
   const [allGroupsLogsCount, setAllGroupsLogsCount] = useState(0);
-  const [totalPeople, setTotalPeople] = useState(0);   // 🆕 현재 등록 인원(분모)
-  // 🛠️ [패치] 주소창의 조 번호를 명확하게 인지할 때까지 감시하고 정해지면 데이터를 불러옵니다.
-const groupId = queryId; 
+  const [totalPeople, setTotalPeople] = useState(0); // 🆕 현재 등록 인원(분모). 이탈하면 자동으로 줄어듦
 
-  // 현재 탭·월에 맞는 global 조회용 월 파라미터 (150일 대장정이면 null → 전체 집계)
+  const groupId = queryId; 
+
+  // 🆕 현재 탭·월에 맞는 global 조회용 월 파라미터 (150일 대장정이면 null → 전체 집계)
   const currentMonthParam = () =>
     activeTab === '150일 대장정' ? null : '2026-' + currentMonth.replace('월', '').padStart(2, '0');
 
+  // 조 번호가 정해지면 우리조 데이터 로드
   useEffect(() => {
     if (groupId) {
       setSelectedGroupToggle(groupId);
@@ -42,12 +43,12 @@ const groupId = queryId;
     }
   }, [groupId]);
 
-  // 최초 로드 + 탭 전환 + 월 전환 시, 전체 진도율을 해당 월 기준으로 다시 집계
+  // 🆕 최초 로드 + 탭 전환 + 월 전환 시, 전체 진도율을 해당 월 기준으로 다시 집계
   useEffect(() => {
     if (groupId) fetchGlobalProgress(currentMonthParam());
   }, [groupId, activeTab, currentMonth]);
 
-  // 창으로 돌아올 때(그새 다른 조가 체크했을 수 있으니) 최신화
+  // 🆕 창으로 돌아올 때(그새 다른 조가 체크했을 수 있으니) 최신화
   useEffect(() => {
     const onFocus = () => {
       if (!groupId) return;
@@ -58,7 +59,7 @@ const groupId = queryId;
     return () => window.removeEventListener('focus', onFocus);
   }, [groupId, activeTab, currentMonth]);
 
-const fetchData = async (targetGroupId) => {
+  const fetchData = async (targetGroupId) => {
     if (!targetGroupId) return;
     const res = await fetch(`/api/tongdok?groupId=${targetGroupId}&_cb=${Date.now()}`);
     if (res.ok) {
@@ -68,9 +69,9 @@ const fetchData = async (targetGroupId) => {
       setLogs(result.logs || []);
     }
   };
-const [totalPeople, setTotalPeople] = useState(0);
 
-const fetchGlobalProgress = async (month) => {
+  // 🆕 월 파라미터를 받아 해당 월(또는 전체) 전 조 집계 + 현재 등록 인원을 함께 받아옴
+  const fetchGlobalProgress = async (month) => {
     const q = month ? `&month=${month}` : '';
     const res = await fetch(`/api/tongdok?global=true${q}&_cb=${Date.now()}`);
     const result = await res.json();
@@ -100,7 +101,7 @@ const fetchGlobalProgress = async (month) => {
     if (response.ok) {
       alert('명단이 성공적으로 저장되었습니다!');
       await fetchData(groupId);
-      await fetchGlobalProgress(currentMonthParam()); 
+      await fetchGlobalProgress(currentMonthParam());
     } else {
       // 🛠️ [패치] 실패 시 백엔드가 준 구체적인 에러 메시지를 띄우도록 보완합니다.
       const errData = await response.json();
@@ -108,7 +109,7 @@ const fetchGlobalProgress = async (month) => {
     }
   };
 
-const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
+  const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
     if (!groupId) return;
 
     try {
@@ -146,20 +147,20 @@ const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
     let isInactive = false;
     if (memberLogs.length > 0) {
       const latestDate = new Date(
-  Math.max(...memberLogs.map(l => new Date(l.check_date)))
-);
+        Math.max(...memberLogs.map(l => new Date(l.check_date)))
+      );
 
-const now = new Date();
+      const now = new Date();
 
-if (latestDate <= now) {
-  const diffDays = Math.ceil(
-    (now - latestDate) / (1000 * 60 * 60 * 24)
-  );
+      if (latestDate <= now) {
+        const diffDays = Math.ceil(
+          (now - latestDate) / (1000 * 60 * 60 * 24)
+        );
 
-  if (diffDays > 5) {
-    isInactive = true;
-  }
-}
+        if (diffDays > 5) {
+          isInactive = true;
+        }
+      }
     } else {
       isInactive = true;
     }
@@ -177,9 +178,11 @@ if (latestDate <= now) {
   if (activeTab === '우리 조 작품') {
     progressPercent = groupTargetGoal > 0 ? ((groupCurrentChecked / groupTargetGoal) * 100) : 0;
   } else if (activeTab === '이달의 명화 전시관') {
+    // 🆕 분모 = 현재 등록 인원 × 그달 일수 (하드코딩 1500 제거). totalPeople 로딩 전에는 0으로 안전 처리
     const goal = totalPeople * targetDays;
     progressPercent = goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
   } else {
+    // 🆕 150일 대장정: 분모 = 현재 등록 인원 × 150일치
     const goal = totalPeople * TOTAL_150_DAYS;
     progressPercent = goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
   }
@@ -195,11 +198,11 @@ if (latestDate <= now) {
       maskValue = 'radial-gradient(circle at 50% 68%, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
     } else {
       switch(currentMonth) {
-       case '7월': {
+        case '7월': {
           // 맞닿은 손끝 사이(35% 47%)에서 아주 작게 시작 → 진행률만큼 선형으로 커짐
           const jCore = Number(percent);   // 완전 밝은 반경 (진행률 1:1)
-          const jEdge = jCore + 5;          // 페이드 폭
-          maskValue = 'radial-gradient(circle at 37% 47%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
+          const jEdge = jCore + 5;          // 페이드 폭 (작을수록 시작 원이 더 조여짐)
+          maskValue = 'radial-gradient(circle at 35% 47%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
           break;
         }
         case '8월':
@@ -212,12 +215,10 @@ if (latestDate <= now) {
           maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
         case '11월': {
-          // 진행률만큼 '밝음 경계'가 바깥→안쪽으로 선형 이동.
-          // 매일 쌓이는 체크만큼 경계가 일정하게 조금씩 들어옴.
+          // 가장자리부터 진행률만큼 '밝음 경계'가 바깥→안쪽으로 선형 이동 (매일 일정하게 변화)
           const boundary = 100 - Number(percent); // 진행 0→100%, 경계 100→0%
-          const soft = 4; // 어둠→밝음 전환 폭
+          const soft = 4;                          // 어둠→밝음 전환 폭
           const inner = Math.max(boundary - soft, 0);
-
           maskValue =
             'radial-gradient(circle at 50% 50%, ' +
             'rgba(0,0,0,0) 0%, ' +
@@ -231,7 +232,8 @@ if (latestDate <= now) {
       }
     }
     return { WebkitMaskImage: maskValue, maskImage: maskValue, opacity: 1 };
- };
+  };
+
   const isLargeMonth = activeTab !== '150일 대장정' && ['7월', '8월', '9월', '11월'].includes(currentMonth);
   const isOctober = activeTab !== '150일 대장정' && currentMonth === '10월';
 
