@@ -95,14 +95,30 @@ const fetchData = async (targetGroupId) => {
     }
   };
 
-  const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
-    await fetch('/api/tongdok', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: isChecked ? 'check' : 'uncheck', groupId, name: memberName, date: dateStr })
-    });
-    fetchData(groupId);
-    fetchGlobalProgress();
+const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
+    if (!groupId) {
+      alert("조 번호를 아직 읽어오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+
+    try {
+      // 🛠️ 주소 뒤에 ?groupId=... 를 붙여서 백엔드가 인식할 수 있게 합니다.
+      await fetch(`/api/tongdok?groupId=${groupId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: isChecked ? 'check' : 'uncheck', 
+          name: memberName, 
+          date: dateStr 
+        })
+      });
+      
+      // 데이터 새로고침도 순서대로 확실하게 처리되도록 await를 붙여줍니다.
+      await fetchData(groupId);
+      await fetchGlobalProgress();
+    } catch (err) {
+      console.error("체크박스 업데이트 실패:", err);
+    }
   };
 
   const handleGroupToggleChange = (e) => {
