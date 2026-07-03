@@ -41,21 +41,12 @@ export default function GroupDashboard() {
 
 const fetchData = async (targetGroupId) => {
     if (!targetGroupId) return;
-    try {
-      // 🛠️ [패치] 주소 뒤에 현재 시간을 붙여 브라우저가 304 캐시 처리를 못 하도록 강제 차단합니다.
-      const res = await fetch(`/api/tongdok?groupId=${targetGroupId}&_cb=${Date.now()}`);
-      
-      if (res.ok) {
-        const result = await res.json();
-        setMembers(result.members || []);
-        setLogs(result.logs || []);
-        
-        if (String(targetGroupId) === String(groupId)) {
-          setMemberInput((result.members || []).map(m => m.name).join(', '));
-        }
-      }
-    } catch (err) {
-      console.error("데이터 로드 실패:", err);
+    const res = await fetch(`/api/tongdok?groupId=${targetGroupId}&_cb=${Date.now()}`);
+    if (res.ok) {
+      const result = await res.json();
+      // 🛠️ 패치: 명단 순서를 고정하고, 상태를 업데이트합니다.
+      setMembers([...result.members]); 
+      setLogs(result.logs || []);
     }
   };
 
