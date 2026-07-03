@@ -183,25 +183,22 @@ if (latestDate <= now) {
         case '10월':
           maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
-        case '11월':
-           const edgeProgress = Math.pow(percent / 100, 2) * 25;
+        if (currentMonth === '11월') {
+  // 끝까지 진행되어도 테두리에서 3%만 안쪽으로 이동
+  const edge = (Number(percent) / 100) * 3;
 
-  maskValue = `
-    radial-gradient(
-      circle at 50% 50%,
-      rgba(0,0,0,0) ${edgeProgress}%,
-      rgba(0,0,0,0.08) ${edgeProgress + 3}%,
-      rgba(0,0,0,0.20) ${edgeProgress + 7}%,
-      rgba(0,0,0,0.45) ${edgeProgress + 12}%,
-      rgba(0,0,0,0.90) 100%
-    )
-  `;
-  break;
-        default:
-          maskValue = 'radial-gradient(circle at 50% 50%, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
-      }
-    }
-    return { WebkitMaskImage: maskValue, maskImage: maskValue, opacity: 1 };
+  return {
+    clipPath: `inset(${edge}% ${edge}% ${edge}% ${edge}%)`,
+    WebkitClipPath: `inset(${edge}% ${edge}% ${edge}% ${edge}%)`,
+    opacity: 1
+  };
+}
+
+return {
+  WebkitMaskImage: maskValue,
+  maskImage: maskValue,
+  opacity: 1
+};
   };
 
   const isLargeMonth = activeTab !== '150일 대장정' && ['7월', '8월', '9월', '11월'].includes(currentMonth);
