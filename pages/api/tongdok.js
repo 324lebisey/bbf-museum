@@ -24,12 +24,21 @@ if (global === 'true') {
     }
 
     // 2. 데이터 불러오기 (GET)
-    if (req.method === 'GET') {
-      const members = await sql`SELECT id, name FROM group_members WHERE group_id = ${groupId}`;
-      const logs = await sql`SELECT member_name, check_date FROM tongdok_logs WHERE group_id = ${groupId}`;
-      
-      return res.status(200).json({ members, logs });
-    }
+    // pages/api/tongdok.js 의 GET 부분 (전체 교체)
+if (req.method === 'GET') {
+  // 🛠️ 명단은 id(등록순)로, 로그는 날짜순으로 강제 정렬하여 보내줍니다.
+  const members = await sql`
+    SELECT id, name FROM group_members 
+    WHERE group_id = ${groupId} 
+    ORDER BY id ASC`;
+    
+  const logs = await sql`
+    SELECT member_name, check_date FROM tongdok_logs 
+    WHERE group_id = ${groupId} 
+    ORDER BY check_date ASC`;
+  
+  return res.status(200).json({ members, logs });
+}
 
     // 3. 데이터 저장 및 변경 (POST)
     if (req.method === 'POST') {
