@@ -19,7 +19,7 @@ export default function GroupDashboard() {
   const router = useRouter();
   const { id: queryId } = router.query;
 
-  const [activeTab, setActiveTab] = useState('우리조 명화');
+  const [activeTab, setActiveTab] = useState('우리 조 작품');
   const [currentMonth, setCurrentMonth] = useState('7월');
   const [selectedGroupToggle, setSelectedGroupToggle] = useState('');
   
