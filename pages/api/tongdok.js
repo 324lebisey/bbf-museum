@@ -12,11 +12,26 @@ export default async function handler(req, res) {
   try {
     // 1. 전체 조의 누적 체크 수 조회 (이달의 명화 / 150일 대장정용)
 if (global === 'true') {
-  const result = await sql`SELECT current_count FROM global_counter WHERE counter_name = 'global_tongdok_count'`;
-  // 🛠️ 패치: 전체 카운트를 그대로 다 보여주지 않고, 3으로 나눈 값만 노출하여 
-  // 체감 속도를 3배 느리게 체감되도록 조정했습니다.
-  const count = Math.floor((result[0]?.current_count || 0) / 3);
-  return res.status(200).json({ globalCount: Number(count) });
+  const { month } = req.query; // '2026-08' 형식. 없으면 150일 전체.
+
+  // 현재 등록 인원 (이탈하면 목표도 자동으로 줄어듦)
+  const [{ people }] = await sql`SELECT COUNT(*)::int AS people FROM group_members`;
+
+  let count;
+  if (month) {
+    const [y, m] = month.split('-').map(Number);
+    const start = `${month}-01`;
+    const nextM = m === 12 ? 1 : m + 1;
+    const nextY = m === 12 ? y + 1 : y;
+    const end = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
+    const r = await sql`SELECT COUNT(*)::int AS c FROM tongdok_logs
+                        WHERE check_date >= ${start} AND check_date < ${end}`;
+    count = r[0].c;
+  } else {
+    const r = await sql`SELECT COUNT(*)::int AS c FROM tongdok_logs`;
+    count = r[0].c;
+  }
+  return res.status(200).json({ globalCount: count, totalPeople: people });
 }
 
     if (!groupId) {
