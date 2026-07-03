@@ -66,16 +66,33 @@ const fetchData = async (targetGroupId) => {
   };
 
   const handleRegisterMembers = async () => {
+    // 🛠️ [패치] 조 번호(groupId)가 비어있거나 인식이 안 되었으면 즉시 중단합니다.
+    if (!groupId) {
+      alert("조 번호(ID)를 주소창에서 아직 읽어오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    
     if (!memberInput.trim()) return;
-    if (!confirm(groupId + '조 명단을 변경하시겠습니까? 기존 기록은 이름이 일치하면 유지됩니다.')) return;
+    if (!confirm(`${groupId}조 명단을 변경하시겠습니까? 기존 기록은 이름이 일치하면 유지됩니다.`)) return;
+    
     const nameList = memberInput.split(',').map(n => n.trim()).filter(n => n !== '');
-    await fetch('/api/tongdok', {
+    
+    // 🛠️ [패치] 주소창 파라미터로도 확실하게 groupId를 꽂아서 보냅니다.
+    const response = await fetch(`/api/tongdok?groupId=${groupId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'register', groupId, names: nameList })
+      body: JSON.stringify({ action: 'register', names: nameList })
     });
-    fetchData(groupId);
-    fetchGlobalProgress();
+
+    if (response.ok) {
+      alert('명단이 성공적으로 저장되었습니다!');
+      await fetchData(groupId);
+      await fetchGlobalProgress();
+    } else {
+      // 🛠️ [패치] 실패 시 백엔드가 준 구체적인 에러 메시지를 띄우도록 보완합니다.
+      const errData = await response.json();
+      alert(`명단 저장 실패: ${errData.error || '알 수 없는 오류'}`);
+    }
   };
 
   const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
