@@ -17,7 +17,7 @@ const ARTWORKS = {
 
 export default function GroupDashboard() {
   const router = useRouter();
-  const { id: groupId } = router.query;
+  const { id: queryId } = router.query;
 
   const [activeTab, setActiveTab] = useState('우리조 명화');
   const [currentMonth, setCurrentMonth] = useState('7월');
@@ -28,6 +28,9 @@ export default function GroupDashboard() {
   const [logs, setLogs] = useState([]);
   const [allGroupsLogsCount, setAllGroupsLogsCount] = useState(0);
 
+  // 🛠️ [패치] 주소창의 조 번호를 명확하게 인지할 때까지 감시하고 정해지면 데이터를 불러옵니다.
+  const groupId = queryId; 
+
   useEffect(() => {
     if (groupId) {
       setSelectedGroupToggle(groupId);
@@ -37,12 +40,21 @@ export default function GroupDashboard() {
   }, [groupId]);
 
   const fetchData = async (targetGroupId) => {
-    const res = await fetch('/api/tongdok?groupId=' + targetGroupId);
-    const result = await res.json();
-    setMembers(result.members || []);
-    setLogs(result.logs || []);
-    if (Number(targetGroupId) === Number(groupId)) {
-      setMemberInput((result.members || []).map(m => m.name).join(', '));
+    if (!targetGroupId) return; // 조 번호가 없으면 요청 차단
+    try {
+      const res = await fetch('/api/tongdok?groupId=' + targetGroupId);
+      if (res.ok) {
+        const result = await res.json();
+        setMembers(result.members || []);
+        setLogs(result.logs || []);
+        
+        // 내 조의 화면일 때만 입력창에 기존 명단 넣어주기
+        if (String(targetGroupId) === String(groupId)) {
+          setMemberInput((result.members || []).map(m => m.name).join(', '));
+        }
+      }
+    } catch (err) {
+      console.error("데이터 로드 실패:", err);
     }
   };
 
