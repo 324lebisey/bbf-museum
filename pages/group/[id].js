@@ -49,12 +49,15 @@ const fetchData = async (targetGroupId) => {
       setLogs(result.logs || []);
     }
   };
+const [totalPeople, setTotalPeople] = useState(0);
 
-  const fetchGlobalProgress = async () => {
-    const res = await fetch('/api/tongdok?global=true');
-    const result = await res.json();
-    setAllGroupsLogsCount(result.globalCount || 0);
-  };
+const fetchGlobalProgress = async (month) => {
+  const q = month ? `&month=${month}` : '';
+  const res = await fetch(`/api/tongdok?global=true${q}&_cb=${Date.now()}`);
+  const result = await res.json();
+  setAllGroupsLogsCount(result.globalCount || 0);
+  setTotalPeople(result.totalPeople || 0);
+};
 
   const handleRegisterMembers = async () => {
     // 🛠️ [패치] 조 번호(groupId)가 비어있거나 인식이 안 되었으면 즉시 중단합니다.
@@ -155,9 +158,9 @@ if (latestDate <= now) {
   if (activeTab === '우리 조 작품') {
     progressPercent = groupTargetGoal > 0 ? ((groupCurrentChecked / groupTargetGoal) * 100) : 0;
   } else if (activeTab === '이달의 명화 전시관') {
-    progressPercent = (allGroupsLogsCount / (1500 * targetDays)) * 100;
+    progressPercent = (allGroupsLogsCount / (totalPeople * targetDays)) * 100;
   } else {
-    progressPercent = (allGroupsLogsCount / (1500 * TOTAL_150_DAYS)) * 100;
+    progressPercent = (allGroupsLogsCount / (totalPeople * TOTAL_150_DAYS)) * 100;
   }
   progressPercent = Math.min(Number(progressPercent), 100).toFixed(1);
 
