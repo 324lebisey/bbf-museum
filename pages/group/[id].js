@@ -39,16 +39,17 @@ export default function GroupDashboard() {
     }
   }, [groupId]);
 
-  const fetchData = async (targetGroupId) => {
-    if (!targetGroupId) return; // 조 번호가 없으면 요청 차단
+const fetchData = async (targetGroupId) => {
+    if (!targetGroupId) return;
     try {
-      const res = await fetch('/api/tongdok?groupId=' + targetGroupId);
+      // 🛠️ [패치] 주소 뒤에 현재 시간을 붙여 브라우저가 304 캐시 처리를 못 하도록 강제 차단합니다.
+      const res = await fetch(`/api/tongdok?groupId=${targetGroupId}&_cb=${Date.now()}`);
+      
       if (res.ok) {
         const result = await res.json();
         setMembers(result.members || []);
         setLogs(result.logs || []);
         
-        // 내 조의 화면일 때만 입력창에 기존 명단 넣어주기
         if (String(targetGroupId) === String(groupId)) {
           setMemberInput((result.members || []).map(m => m.name).join(', '));
         }
