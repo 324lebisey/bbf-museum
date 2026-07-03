@@ -175,7 +175,7 @@ if (latestDate <= now) {
           // 맞닿은 손끝 사이(35% 47%)에서 아주 작게 시작 → 진행률만큼 선형으로 커짐
           const jCore = Number(percent);   // 완전 밝은 반경 (진행률 1:1)
           const jEdge = jCore + 5;          // 페이드 폭
-          maskValue = 'radial-gradient(circle at 35% 47%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
+          maskValue = 'radial-gradient(circle at 37% 47%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
           break;
         }
         case '8월':
