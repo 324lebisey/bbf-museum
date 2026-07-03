@@ -87,14 +87,11 @@ const fetchData = async (targetGroupId) => {
   };
 
 const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
-    if (!groupId) {
-      alert("조 번호를 아직 읽어오지 못했습니다. 잠시 후 다시 시도해 주세요.");
-      return;
-    }
+    if (!groupId) return;
 
     try {
-      // 🛠️ 주소 뒤에 ?groupId=... 를 붙여서 백엔드가 인식할 수 있게 합니다.
-      await fetch(`/api/tongdok?groupId=${groupId}`, {
+      // 1. 서버에 상태 변경 요청 (await로 완료될 때까지 대기)
+      const response = await fetch(`/api/tongdok?groupId=${groupId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -103,12 +100,17 @@ const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
           date: dateStr 
         })
       });
-      
-      // 데이터 새로고침도 순서대로 확실하게 처리되도록 await를 붙여줍니다.
-      await fetchData(groupId);
-      await fetchGlobalProgress();
+
+      if (response.ok) {
+        // 2. 서버가 성공했을 때만 최신 데이터를 불러와 화면 갱신
+        // 기존의 '미리 업데이트(Optimistic Update)'를 지워 데이터 꼬임을 방지합니다.
+        await fetchData(groupId);
+        await fetchGlobalProgress();
+      } else {
+        alert("체크 상태 저장에 실패했습니다. 다시 시도해 주세요.");
+      }
     } catch (err) {
-      console.error("체크박스 업데이트 실패:", err);
+      console.error("체크박스 통신 오류:", err);
     }
   };
 
@@ -171,7 +173,18 @@ const handleCheckboxToggle = async (memberName, dateStr, isChecked) => {
           maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
         case '11월':
-           maskValue = 'radial-gradient(circle at 50% 50%, rgba(0,0,0,0) ' + edgeProgress + '%, rgba(0,0,0,1) ' + (edgeProgress + 20) + '%)';
+           cconst edgeProgress = percent * 0.3;
+
+  maskValue =
+    `radial-gradient(
+      circle at 50% 50%,
+      rgba(0,0,0,0) ${edgeProgress}%,
+      rgba(0,0,0,0.05) ${edgeProgress + 20}%,
+      rgba(0,0,0,0.12) ${edgeProgress + 40}%,
+      rgba(0,0,0,0.28) ${edgeProgress + 60}%,
+      rgba(0,0,0,0.55) ${edgeProgress + 80}%,
+      rgba(0,0,0,0.92) 100%
+    )`;
   break;
         default:
           maskValue = 'radial-gradient(circle at 50% 50%, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
