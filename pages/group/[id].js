@@ -214,7 +214,7 @@ export default function GroupDashboard() {
           const aCore = Number(percent);              // 완전 밝은 반경 (진행률 1:1)
           const aEdge = aCore + 4;                     // 페이드 폭 (작을수록 시작이 더 작음)
           const peak = Math.min(1, Number(percent) / 6); // 6%까진 반투명(희미), 이후 완전
-          maskValue = 'radial-gradient(circle at 14% 58%, rgba(0,0,0,' + peak + ') ' + aCore + '%, rgba(0,0,0,0) ' + aEdge + '%)';
+          maskValue = 'radial-gradient(circle at 16% 65%, rgba(0,0,0,' + peak + ') ' + aCore + '%, rgba(0,0,0,0) ' + aEdge + '%)';
           break;
         }
         case '9월':
