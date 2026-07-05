@@ -198,8 +198,8 @@ export default function GroupDashboard() {
       // 중앙 아래(50% 68%)에서 진행률만큼 작게 시작 → 서서히 커짐.
       // 기존 start(×1.2)+end(+20) 때문에 초반부터 빛이 너무 컸음 → 1:1 + 좁은 페이드로 교체
       const core = Number(percent);   // 완전 밝은 반경 (진행률 1:1)
-      const edge = core + 5;          // 페이드 폭 (작을수록 시작 빛이 더 작음)
-      maskValue = 'radial-gradient(circle at 50% 68%, rgba(0,0,0,1) ' + core + '%, rgba(0,0,0,0) ' + edge + '%)';
+      const edge = core + 3;          // 페이드 폭 (작을수록 시작 빛이 더 작음)
+      maskValue = 'radial-gradient(circle at 50% 75%, rgba(0,0,0,1) ' + core + '%, rgba(0,0,0,0) ' + edge + '%)';
     } else {
       switch(currentMonth) {
         case '7월': {
@@ -209,9 +209,14 @@ export default function GroupDashboard() {
           maskValue = 'radial-gradient(circle at 35% 47%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
           break;
         }
-        case '8월':
-          maskValue = 'radial-gradient(circle at 25% 75%, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
+        case '8월': {
+          // 아기 예수(왼쪽 아래 흰 천 위)에서 작고 희미하게 시작 → 서서히 커짐
+          const aCore = Number(percent);              // 완전 밝은 반경 (진행률 1:1)
+          const aEdge = aCore + 4;                     // 페이드 폭 (작을수록 시작이 더 작음)
+          const peak = Math.min(1, Number(percent) / 6); // 6%까진 반투명(희미), 이후 완전
+          maskValue = 'radial-gradient(circle at 14% 58%, rgba(0,0,0,' + peak + ') ' + aCore + '%, rgba(0,0,0,0) ' + aEdge + '%)';
           break;
+        }
         case '9월':
           maskValue = 'linear-gradient(315deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
