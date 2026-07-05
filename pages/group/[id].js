@@ -19,7 +19,7 @@ export default function GroupDashboard() {
   const router = useRouter();
   const { id: queryId } = router.query;
 
-  const [activeTab, setActiveTab] = useState('우리조 명화');
+  const [activeTab, setActiveTab] = useState('우리 조 작품');
   const [currentMonth, setCurrentMonth] = useState('7월');
   const [selectedGroupToggle, setSelectedGroupToggle] = useState('');
   
@@ -175,7 +175,7 @@ export default function GroupDashboard() {
   const groupCurrentChecked = logs.filter(l => l.check_date.includes('-' + monthString + '-')).length;
 
   let progressPercent = 0;
-  if (activeTab === '우리조 명화') {
+  if (activeTab === '우리 조 작품') {
     progressPercent = groupTargetGoal > 0 ? ((groupCurrentChecked / groupTargetGoal) * 100) : 0;
   } else if (activeTab === '이달의 명화 전시관') {
     // 🆕 분모 = 현재 등록 인원 × 그달 일수 (하드코딩 1500 제거). totalPeople 로딩 전에는 0으로 안전 처리
@@ -257,7 +257,7 @@ export default function GroupDashboard() {
         </header>
 
         <div className="flex justify-center gap-1 mb-6 bg-[#121215] p-1.5 rounded-xl border border-[#1F1F23] max-w-md mx-auto">
-          {['150일 대장정', '이달의 명화 전시관', '우리조 명화'].map(tab => (
+          {['150일 대장정', '이달의 명화 전시관', '우리 조 작품'].map(tab => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab); fetchData(groupId); }}
@@ -282,7 +282,7 @@ export default function GroupDashboard() {
           </div>
         )}
 
-        {activeTab === '우리조 명화' && (
+        {activeTab === '우리 조 작품' && (
           <div className="flex justify-end items-center gap-2 mb-4">
             <span className="text-xs text-[#52525B]">타 조 갤러리 순회:</span>
             <select value={selectedGroupToggle} onChange={handleGroupToggleChange} className="bg-[#121215] border border-[#27272A] rounded-lg px-3 py-1.5 text-xs text-[#A1A1AA] focus:outline-none focus:border-[#E67E22]">
@@ -315,12 +315,12 @@ export default function GroupDashboard() {
           </div>
           {/* 🛠️ [패치] 그림이 10% 확대되었을 때 수치 마진이 겹치지 않도록 간격 최적화 */}
           <div className={'text-[11px] text-[#52525B] font-mono tracking-widest uppercase transition-all ' + (isOctober ? 'mt-10' : 'mt-6')}>
-            {activeTab === '우리조 명화' ? selectedGroupToggle + '조 ' + currentMonth + ' 진도율' : activeTab + ' 진척도'}
+            {activeTab === '우리 조 작품' ? selectedGroupToggle + '조 ' + currentMonth + ' 진도율' : activeTab + ' 진척도'}
           </div>
           <div className="text-5xl font-black text-[#E67E22] mt-1 tracking-tighter">{progressPercent}%</div>
         </div>
 
-        {activeTab === '우리조 명화' && Number(selectedGroupToggle) === Number(groupId) && (
+        {activeTab === '우리 조 작품' && Number(selectedGroupToggle) === Number(groupId) && (
           <div className="bg-[#121215] p-6 rounded-2xl border border-[#1F1F23] shadow-xl">
             <div className="mb-4">
               <h3 className="text-base font-bold text-[#F4F4F5] flex items-center gap-2">
