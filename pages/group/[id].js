@@ -223,9 +223,13 @@ export default function GroupDashboard() {
           maskValue = 'radial-gradient(circle at 18% 67%, rgba(0,0,0,' + peak + ') ' + aCore + '%, rgba(0,0,0,0) ' + aEdge + '%)';
           break;
         }
-        case '9월':
-          maskValue = 'linear-gradient(315deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
+        case '9월': {
+          // 좌하단→우상단 대각선으로 차오름. 초반 넓은 면적의 원인인 페이드 20 → 5로 축소.
+          const level = Math.pow(Number(percent) / 100, 1.8) * 100; // 차오르는 정도(지수 클수록 느림)
+          const band = level + 5; // ★ 0.2%일 때 밝은 면적을 좌우
+          maskValue = 'linear-gradient(315deg, rgba(0,0,0,1) ' + level + '%, rgba(0,0,0,0) ' + band + '%)';
           break;
+        }
         case '10월': {
           // 밑에서 위로 차오름. 초반 밝은 면적의 진짜 원인은 페이드 폭이라 15 → 5로 축소.
           const level = Math.pow(Number(percent) / 100, 1.8) * 100; // 차오르는 높이(지수 클수록 느림)
