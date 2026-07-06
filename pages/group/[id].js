@@ -227,9 +227,9 @@ export default function GroupDashboard() {
           maskValue = 'linear-gradient(315deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
         case '10월': {
-          // 밑부분부터 위로 차오르는 속도를 늦춤 (기존 percent×1.2 선형 → 지수 곡선)
-          const level = Math.pow(Number(percent) / 100, 1.8) * 100; // 지수 클수록 초반이 더 느림
-          const band = level + 15; // 페이드 폭 (작을수록 경계가 또렷)
+          // 밑에서 위로 차오름. 초반 밝은 면적의 진짜 원인은 페이드 폭이라 15 → 5로 축소.
+          const level = Math.pow(Number(percent) / 100, 1.8) * 100; // 차오르는 높이(지수 클수록 느림)
+          const band = level + 3; // ★ 이 값이 '0.2%일 때 밝은 면적'을 좌우함
           maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + level + '%, rgba(0,0,0,0) ' + band + '%)';
           break;
         }
