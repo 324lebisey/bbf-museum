@@ -228,7 +228,7 @@ export default function GroupDashboard() {
           break;
         case '10월': {
           // 밑부분부터 위로 차오르는 속도를 늦춤 (기존 percent×1.2 선형 → 지수 곡선)
-          const level = Math.pow(Number(percent) / 100, 1.4) * 100; // 지수 클수록 초반이 더 느림
+          const level = Math.pow(Number(percent) / 100, 1.8) * 100; // 지수 클수록 초반이 더 느림
           const band = level + 15; // 페이드 폭 (작을수록 경계가 또렷)
           maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + level + '%, rgba(0,0,0,0) ' + band + '%)';
           break;
