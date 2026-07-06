@@ -58,7 +58,13 @@ export default function GroupDashboard() {
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [groupId, activeTab, currentMonth]);
-
+// 🆕 모든 명화를 미리 로드해 캐시에 넣어둠 → 탭/월 전환 시 그림이 즉시 바뀜
+  useEffect(() => {
+    Object.values(ARTWORKS).forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, []);
   const fetchData = async (targetGroupId) => {
     if (!targetGroupId) return;
     const res = await fetch(`/api/tongdok?groupId=${targetGroupId}&_cb=${Date.now()}`);
@@ -220,9 +226,13 @@ export default function GroupDashboard() {
         case '9월':
           maskValue = 'linear-gradient(315deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
           break;
-        case '10월':
-          maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
+        case '10월': {
+          // 밑부분부터 위로 차오르는 속도를 늦춤 (기존 percent×1.2 선형 → 지수 곡선)
+          const level = Math.pow(Number(percent) / 100, 1.4) * 100; // 지수 클수록 초반이 더 느림
+          const band = level + 15; // 페이드 폭 (작을수록 경계가 또렷)
+          maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + level + '%, rgba(0,0,0,0) ' + band + '%)';
           break;
+        }
         case '11월': {
           // 가장자리부터 진행률만큼 '밝음 경계'가 바깥→안쪽으로 선형 이동 (매일 일정하게 변화)
           const boundary = 100 - Number(percent); // 진행 0→100%, 경계 100→0%
@@ -260,7 +270,7 @@ export default function GroupDashboard() {
           {['150일 대장정', '이달의 명화 전시관', '우리 조 작품'].map(tab => (
             <button
               key={tab}
-              onClick={() => { setActiveTab(tab); fetchData(groupId); }}
+              onClick={() => { setActiveTab(tab);}}
               className={'flex-1 text-center py-2 text-xs md:text-sm font-bold rounded-lg transition-all ' + (activeTab === tab ? 'bg-[#E67E22] text-white shadow-lg' : 'text-[#71717A] hover:text-[#A1A1AA]')}
             >
               {tab}
