@@ -15,6 +15,50 @@ const ARTWORKS = {
   '11월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg/3840px-The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg'
 };
 
+// ── 일차(주일 제외) 유틸 ──────────────────────────────
+const MONTH_ORDER = ['7월', '8월', '9월', '10월', '11월'];
+
+// 해당 월의 통독일 실제 날짜 배열 — [i]가 (i+1)일차의 달력 날짜 (주일 제외)
+const getReadingDates = (monthLabel) => {
+  const m = Number(monthLabel.replace('월', ''));
+  const lastDay = new Date(2026, m, 0).getDate();
+  const arr = [];
+  for (let d = 1; d <= lastDay; d++) {
+    const dt = new Date(2026, m - 1, d);
+    if (dt.getDay() !== 0) arr.push(dt); // 주일(0) 제외
+  }
+  return arr;
+};
+
+// 저장된 값('2026-MM-일차')을 프로그램 전체 누적 일차로 변환 (7월 1일차 = 1)
+const toGlobalIndex = (checkDate) => {
+  const [, mm, dd] = checkDate.split('-').map(Number);
+  let idx = 0;
+  for (const label of MONTH_ORDER) {
+    if (Number(label.replace('월', '')) < mm) idx += TOTAL_DAYS_BY_MONTH[label];
+  }
+  return idx + dd;
+};
+
+// 오늘이 누적 몇 일차인지 (주일이면 직전 통독일까지 센 값)
+const getTodayGlobalIndex = () => {
+  const today = new Date();
+  const mm = today.getMonth() + 1;
+  let idx = 0;
+  for (const label of MONTH_ORDER) {
+    const m = Number(label.replace('월', ''));
+    if (m < mm) { idx += TOTAL_DAYS_BY_MONTH[label]; continue; }
+    if (m === mm) {
+      for (let d = 1; d <= today.getDate(); d++) {
+        if (new Date(2026, m - 1, d).getDay() !== 0) idx++;
+      }
+    }
+    break;
+  }
+  return idx;
+};
+// ─────────────────────────────────────────────────────
+
 export default function GroupDashboard() {
   const router = useRouter();
   const { id: queryId } = router.query;
@@ -27,15 +71,15 @@ export default function GroupDashboard() {
   const [members, setMembers] = useState([]);
   const [logs, setLogs] = useState([]);
   const [allGroupsLogsCount, setAllGroupsLogsCount] = useState(0);
-  const [totalPeople, setTotalPeople] = useState(0); // 🆕 현재 등록 인원(분모). 이탈하면 자동으로 줄어듦
+  const [totalPeople, setTotalPeople] = useState(0); // 현재 등록 인원(분모). 이탈하면 자동으로 줄어듦
 
   const groupId = queryId; 
 
-  // 🆕 현재 탭·월에 맞는 global 조회용 월 파라미터 (150일 대장정이면 null → 전체 집계)
+  // 현재 탭·월에 맞는 global 조회용 월 파라미터 (150일 대장정이면 null → 전체 집계)
   const currentMonthParam = () =>
     activeTab === '150일 대장정' ? null : '2026-' + currentMonth.replace('월', '').padStart(2, '0');
 
-  // 조 번호가 정해지면 우리조 데이터 로드
+  // 조 번호가 정해지면 우리 조 데이터 로드
   useEffect(() => {
     if (groupId) {
       setSelectedGroupToggle(groupId);
@@ -43,12 +87,12 @@ export default function GroupDashboard() {
     }
   }, [groupId]);
 
-  // 🆕 최초 로드 + 탭 전환 + 월 전환 시, 전체 진도율을 해당 월 기준으로 다시 집계
+  // 최초 로드 + 탭 전환 + 월 전환 시, 전체 진도율을 해당 월 기준으로 다시 집계
   useEffect(() => {
     if (groupId) fetchGlobalProgress(currentMonthParam());
   }, [groupId, activeTab, currentMonth]);
 
-  // 🆕 창으로 돌아올 때(그새 다른 조가 체크했을 수 있으니) 최신화
+  // 창으로 돌아올 때(그새 다른 조가 체크했을 수 있으니) 최신화
   useEffect(() => {
     const onFocus = () => {
       if (!groupId) return;
@@ -58,25 +102,27 @@ export default function GroupDashboard() {
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [groupId, activeTab, currentMonth]);
-// 🆕 모든 명화를 미리 로드해 캐시에 넣어둠 → 탭/월 전환 시 그림이 즉시 바뀜
+
+  // 모든 명화를 미리 로드해 캐시에 넣어둠 → 탭/월 전환 시 그림이 즉시 바뀜
   useEffect(() => {
     Object.values(ARTWORKS).forEach((src) => {
       const img = new Image();
       img.src = src;
     });
   }, []);
+
   const fetchData = async (targetGroupId) => {
     if (!targetGroupId) return;
     const res = await fetch(`/api/tongdok?groupId=${targetGroupId}&_cb=${Date.now()}`);
     if (res.ok) {
       const result = await res.json();
-      // 🛠️ 패치: 명단 순서를 고정하고, 상태를 업데이트합니다.
+      // 명단 순서를 고정하고, 상태를 업데이트합니다.
       setMembers([...result.members]); 
       setLogs(result.logs || []);
     }
   };
 
-  // 🆕 월 파라미터를 받아 해당 월(또는 전체) 전 조 집계 + 현재 등록 인원을 함께 받아옴
+  // 월 파라미터를 받아 해당 월(또는 150일 전체) 전 조 집계 + 현재 등록 인원을 함께 받아옴
   const fetchGlobalProgress = async (month) => {
     const q = month ? `&month=${month}` : '';
     const res = await fetch(`/api/tongdok?global=true${q}&_cb=${Date.now()}`);
@@ -86,7 +132,7 @@ export default function GroupDashboard() {
   };
 
   const handleRegisterMembers = async () => {
-    // 🛠️ [패치] 조 번호(groupId)가 비어있거나 인식이 안 되었으면 즉시 중단합니다.
+    // 조 번호(groupId)가 비어있거나 인식이 안 되었으면 즉시 중단합니다.
     if (!groupId) {
       alert("조 번호(ID)를 주소창에서 아직 읽어오지 못했습니다. 잠시 후 다시 시도해 주세요.");
       return;
@@ -97,7 +143,6 @@ export default function GroupDashboard() {
     
     const nameList = memberInput.split(',').map(n => n.trim()).filter(n => n !== '');
     
-    // 🛠️ [패치] 주소창 파라미터로도 확실하게 groupId를 꽂아서 보냅니다.
     const response = await fetch(`/api/tongdok?groupId=${groupId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -109,7 +154,6 @@ export default function GroupDashboard() {
       await fetchData(groupId);
       await fetchGlobalProgress(currentMonthParam());
     } else {
-      // 🛠️ [패치] 실패 시 백엔드가 준 구체적인 에러 메시지를 띄우도록 보완합니다.
       const errData = await response.json();
       alert(`명단 저장 실패: ${errData.error || '알 수 없는 오류'}`);
     }
@@ -119,7 +163,6 @@ export default function GroupDashboard() {
     if (!groupId) return;
 
     try {
-      // 1. 서버에 체크 상태 변경 요청
       const response = await fetch(`/api/tongdok?groupId=${groupId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,7 +174,6 @@ export default function GroupDashboard() {
       });
 
       if (response.ok) {
-        // 2. 서버 응답이 성공한 경우에만 fetchData를 호출하여 데이터 동기화
         await fetchData(groupId);
         await fetchGlobalProgress(currentMonthParam());
       } else {
@@ -148,25 +190,18 @@ export default function GroupDashboard() {
     fetchData(target);
   };
 
+  // ── 비활성 판정: 달력 날짜가 아니라 '일차(주일 제외)' 기준 ──
+  const todayGlobal = getTodayGlobalIndex();               // 예: 7/7(화) → 6일차
+  const isTodayReadingDay = new Date().getDay() !== 0;     // 주일이면 오늘은 셀 날이 아님
+
   const processedMembers = members.map(m => {
     const memberLogs = logs.filter(l => l.member_name === m.name);
     let isInactive = false;
     if (memberLogs.length > 0) {
-      const latestDate = new Date(
-        Math.max(...memberLogs.map(l => new Date(l.check_date)))
-      );
-
-      const now = new Date();
-
-      if (latestDate <= now) {
-        const diffDays = Math.ceil(
-          (now - latestDate) / (1000 * 60 * 60 * 24)
-        );
-
-        if (diffDays > 5) {
-          isInactive = true;
-        }
-      }
+      const latestGlobal = Math.max(...memberLogs.map(l => toGlobalIndex(l.check_date)));
+      // 안 읽은 일차 = 마지막 체크 다음 일차 ~ (오늘이 통독일이면 어제 일차까지)
+      const missed = Math.max(todayGlobal - latestGlobal - (isTodayReadingDay ? 1 : 0), 0);
+      if (missed >= 5) isInactive = true;
     } else {
       isInactive = true;
     }
@@ -180,15 +215,18 @@ export default function GroupDashboard() {
   const monthString = currentMonth.replace('월', '').padStart(2, '0');
   const groupCurrentChecked = logs.filter(l => l.check_date.includes('-' + monthString + '-')).length;
 
+  // 주간 구분선용: [i] = (i+1)일차의 실제 달력 날짜
+  const readingDates = getReadingDates(currentMonth);
+
   let progressPercent = 0;
   if (activeTab === '우리 조 작품') {
     progressPercent = groupTargetGoal > 0 ? ((groupCurrentChecked / groupTargetGoal) * 100) : 0;
   } else if (activeTab === '이달의 명화 전시관') {
-    // 🆕 분모 = 현재 등록 인원 × 그달 일수 (하드코딩 1500 제거). totalPeople 로딩 전에는 0으로 안전 처리
+    // 분모 = 현재 등록 인원 × 그달 일수. totalPeople 로딩 전에는 0으로 안전 처리
     const goal = totalPeople * targetDays;
     progressPercent = goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
   } else {
-    // 🆕 150일 대장정: 분모 = 현재 등록 인원 × 150일치
+    // 150일 대장정: 분모 = 현재 등록 인원 × 150일치
     const goal = totalPeople * TOTAL_150_DAYS;
     progressPercent = goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
   }
@@ -197,15 +235,12 @@ export default function GroupDashboard() {
   const getMaskStyle = (percent) => {
     if (Number(percent) === 0) return { WebkitMaskImage: 'none', maskImage: 'none', opacity: 0 };
     let maskValue = '';
-    const start = percent * 1.2;
-    const end = start + 20;
 
     if (activeTab === '150일 대장정') {
-      // 중앙 아래(50% 68%)에서 진행률만큼 작게 시작 → 서서히 커짐.
-      // 기존 start(×1.2)+end(+20) 때문에 초반부터 빛이 너무 컸음 → 1:1 + 좁은 페이드로 교체
+      // 중앙 아래(50% 68%)에서 진행률만큼 작게 시작 → 서서히 커짐
       const core = Number(percent);   // 완전 밝은 반경 (진행률 1:1)
-      const edge = core + 3;          // 페이드 폭 (작을수록 시작 빛이 더 작음)
-      maskValue = 'radial-gradient(circle at 50% 75%, rgba(0,0,0,1) ' + core + '%, rgba(0,0,0,0) ' + edge + '%)';
+      const edge = core + 5;          // 페이드 폭 (작을수록 시작 빛이 더 작음)
+      maskValue = 'radial-gradient(circle at 50% 68%, rgba(0,0,0,1) ' + core + '%, rgba(0,0,0,0) ' + edge + '%)';
     } else {
       switch(currentMonth) {
         case '7월': {
@@ -216,22 +251,22 @@ export default function GroupDashboard() {
           break;
         }
         case '8월': {
-          // 아기 예수(왼쪽 아래 흰 천 위)에서 작고 희미하게 시작 → 서서히 커짐
-          const aCore = Number(percent);              // 완전 밝은 반경 (진행률 1:1)
-          const aEdge = aCore + 4;                     // 페이드 폭 (작을수록 시작이 더 작음)
-          const peak = Math.min(1, Number(percent) / 6); // 6%까진 반투명(희미), 이후 완전
+          // 아기 예수(18% 67%)에서 작고 희미하게 시작 → 서서히 커짐
+          const aCore = Number(percent);                 // 완전 밝은 반경 (진행률 1:1)
+          const aEdge = aCore + 4;                        // 페이드 폭 (작을수록 시작이 더 작음)
+          const peak = Math.min(1, Number(percent) / 6);  // 6%까진 반투명(희미), 이후 완전
           maskValue = 'radial-gradient(circle at 18% 67%, rgba(0,0,0,' + peak + ') ' + aCore + '%, rgba(0,0,0,0) ' + aEdge + '%)';
           break;
         }
         case '9월': {
-          // 좌하단→우상단 대각선으로 차오름. 초반 넓은 면적의 원인인 페이드 20 → 5로 축소.
+          // 좌하단→우상단 대각선으로 차오름. 초반 면적은 페이드 폭(+5)이 결정
           const level = Math.pow(Number(percent) / 100, 1.8) * 100; // 차오르는 정도(지수 클수록 느림)
-          const band = level + 5; // ★ 0.2%일 때 밝은 면적을 좌우
+          const band = level + 5;
           maskValue = 'linear-gradient(315deg, rgba(0,0,0,1) ' + level + '%, rgba(0,0,0,0) ' + band + '%)';
           break;
         }
         case '10월': {
-          // 밑에서 위로 차오름. 초반 밝은 면적의 진짜 원인은 페이드 폭이라 15 → 5로 축소.
+          // 밑에서 위로 차오름. 초반 밝은 면적의 진짜 원인은 페이드 폭이라 15 → 3으로 축소.
           const level = Math.pow(Number(percent) / 100, 1.8) * 100; // 차오르는 높이(지수 클수록 느림)
           const band = level + 3; // ★ 이 값이 '0.2%일 때 밝은 면적'을 좌우함
           maskValue = 'linear-gradient(0deg, rgba(0,0,0,1) ' + level + '%, rgba(0,0,0,0) ' + band + '%)';
@@ -251,7 +286,7 @@ export default function GroupDashboard() {
           break;
         }
         default:
-          maskValue = 'radial-gradient(circle at 50% 50%, rgba(0,0,0,1) ' + start + '%, rgba(0,0,0,0) ' + end + '%)';
+          maskValue = 'radial-gradient(circle at 50% 50%, rgba(0,0,0,1) ' + Number(percent) + '%, rgba(0,0,0,0) ' + (Number(percent) + 10) + '%)';
       }
     }
     return { WebkitMaskImage: maskValue, maskImage: maskValue, opacity: 1 };
@@ -274,7 +309,7 @@ export default function GroupDashboard() {
           {['150일 대장정', '이달의 명화 전시관', '우리 조 작품'].map(tab => (
             <button
               key={tab}
-              onClick={() => { setActiveTab(tab);}}
+              onClick={() => setActiveTab(tab)}
               className={'flex-1 text-center py-2 text-xs md:text-sm font-bold rounded-lg transition-all ' + (activeTab === tab ? 'bg-[#E67E22] text-white shadow-lg' : 'text-[#71717A] hover:text-[#A1A1AA]')}
             >
               {tab}
@@ -307,10 +342,10 @@ export default function GroupDashboard() {
           </div>
         )}
 
-        {/* 🛠️ [패치] 10월 확대 시 짤림을 막기 위해 컨테이너 패딩 가변 조정(isOctober ? 'py-10' : 'p-5 md:p-8') */}
+        {/* 10월 확대 시 짤림을 막기 위해 컨테이너 패딩 가변 조정 */}
         <div className={'bg-[#121215] rounded-2xl border border-[#1F1F23] mb-8 text-center shadow-2xl relative transition-all duration-300 ' + (isOctober ? 'p-10 md:p-12' : 'p-5 md:p-8')}>
           
-          {/* 🛠️ [패치] 원래 비율은 철저히 사수하되, 10월 선택 시에만 'scale-110' 엔진이 직접 개입하여 그림을 확실하게 10% 증폭시킵니다. */}
+          {/* 원래 비율은 사수하되, 10월 선택 시에만 scale-110으로 그림을 10% 증폭 */}
           <div className={'relative mx-auto rounded-xl overflow-hidden border border-[#27272A] inline-block transition-all duration-300 ' + (isOctober ? 'max-w-5xl transform scale-110 shadow-2xl' : isLargeMonth ? 'max-w-5xl' : 'max-w-2xl')}>
             
             <img 
@@ -327,7 +362,7 @@ export default function GroupDashboard() {
             />
 
           </div>
-          {/* 🛠️ [패치] 그림이 10% 확대되었을 때 수치 마진이 겹치지 않도록 간격 최적화 */}
+          {/* 그림이 확대되었을 때 수치 마진이 겹치지 않도록 간격 최적화 */}
           <div className={'text-[11px] text-[#52525B] font-mono tracking-widest uppercase transition-all ' + (isOctober ? 'mt-10' : 'mt-6')}>
             {activeTab === '우리 조 작품' ? selectedGroupToggle + '조 ' + currentMonth + ' 진도율' : activeTab + ' 진척도'}
           </div>
@@ -353,7 +388,15 @@ export default function GroupDashboard() {
                 <thead>
                   <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-xs font-bold">
                     <th className="py-3 px-4 text-left sticky left-0 bg-[#141416] text-[#A1A1AA] z-10 border-r border-[#1F1F23]">이름</th>
-                    {Array.from({ length: targetDays }).map((_, i) => (<th key={i} className="py-3 px-2 min-w-[48px] font-mono text-[#71717A]">{i + 1}일</th>))}
+                    {Array.from({ length: targetDays }).map((_, i) => {
+                      // 주간 구분선: 토요일(한 주의 마지막 통독일) 오른쪽에 얇은 선
+                      const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
+                      return (
+                        <th key={i} className={'py-3 px-2 min-w-[48px] font-mono text-[#71717A]' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
+                          {i + 1}일
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1F1F23]">
@@ -363,8 +406,9 @@ export default function GroupDashboard() {
                       {Array.from({ length: targetDays }).map((_, i) => {
                         const dateStr = '2026-' + monthString + '-' + String(i+1).padStart(2, '0');
                         const isChecked = logs.some(l => l.member_name === member.name && l.check_date === dateStr);
+                        const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
                         return (
-                          <td key={i} className="py-3 px-2">
+                          <td key={i} className={'py-3 px-2' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
                             <input type="checkbox" checked={isChecked} onChange={(e) => handleCheckboxToggle(member.name, dateStr, e.target.checked)} className="accent-[#E67E22] h-4 w-4 rounded border-[#27272A] bg-[#18181C] cursor-pointer" />
                           </td>
                         );
