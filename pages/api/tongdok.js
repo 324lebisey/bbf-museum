@@ -7,54 +7,53 @@ export default async function handler(req, res) {
   }
 
   const sql = neon(process.env.DATABASE_URL);
-  const { groupId, global } = req.query;
+  const { groupId, global, month } = req.query;
 
   try {
-    // 1. 전체 조의 누적 체크 수 조회 (이달의 명화 / 150일 대장정용)
-if (global === 'true') {
-  const { month } = req.query; // '2026-08' 형식. 없으면 150일 전체.
+    // 1. 전체 진도율 집계 (이달의 명화 / 150일 대장정용)
+    //    - month('2026-08' 형식)가 있으면 그 달의 로그만, 없으면 전체(150일)를 실제로 COUNT.
+    //    - 단일 카운터(global_counter) 방식은 폐기 → 중복 클릭으로 숫자가 부풀던 드리프트가 사라짐.
+    //    - totalPeople(현재 등록 인원)을 함께 반환 → 프론트에서 분모로 사용, 이탈 시 목표 자동 감소.
+    if (global === 'true') {
+      const peopleResult = await sql`SELECT COUNT(*)::int AS people FROM group_members`;
+      const people = peopleResult[0]?.people || 0;
 
-  // 현재 등록 인원 (이탈하면 목표도 자동으로 줄어듦)
-  const [{ people }] = await sql`SELECT COUNT(*)::int AS people FROM group_members`;
+      let count = 0;
+      if (month) {
+        // check_date는 '2026-MM-일차' 문자열이므로 prefix 매칭으로 그 달만 집계
+        const prefix = month + '-%';
+        const r = await sql`
+          SELECT COUNT(*)::int AS c FROM tongdok_logs
+          WHERE check_date LIKE ${prefix}
+        `;
+        count = r[0]?.c || 0;
+      } else {
+        const r = await sql`SELECT COUNT(*)::int AS c FROM tongdok_logs`;
+        count = r[0]?.c || 0;
+      }
 
-  let count;
-  if (month) {
-    const [y, m] = month.split('-').map(Number);
-    const start = `${month}-01`;
-    const nextM = m === 12 ? 1 : m + 1;
-    const nextY = m === 12 ? y + 1 : y;
-    const end = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
-    const r = await sql`SELECT COUNT(*)::int AS c FROM tongdok_logs
-                        WHERE check_date >= ${start} AND check_date < ${end}`;
-    count = r[0].c;
-  } else {
-    const r = await sql`SELECT COUNT(*)::int AS c FROM tongdok_logs`;
-    count = r[0].c;
-  }
-  return res.status(200).json({ globalCount: count, totalPeople: people });
-}
+      return res.status(200).json({ globalCount: count, totalPeople: people });
+    }
 
     if (!groupId) {
       return res.status(400).json({ error: 'GroupId가 필요합니다.' });
     }
 
     // 2. 데이터 불러오기 (GET)
-    // pages/api/tongdok.js 의 GET 부분 (전체 교체)
-// pages/api/tongdok.js 의 GET 부분 (전체 교체)
-if (req.method === 'GET') {
-  // 🛠️ 명단은 id(등록순)로, 로그는 날짜순으로 강제 정렬하여 보내줍니다.
-  const members = await sql`
-    SELECT id, name FROM group_members 
-    WHERE group_id = ${groupId} 
-    ORDER BY id ASC`;
-    
-  const logs = await sql`
-    SELECT member_name, check_date FROM tongdok_logs 
-    WHERE group_id = ${groupId} 
-    ORDER BY check_date ASC`;
-  
-  return res.status(200).json({ members, logs });
-}
+    if (req.method === 'GET') {
+      // 명단은 id(등록순)로, 로그는 날짜순으로 강제 정렬하여 보내줍니다.
+      const members = await sql`
+        SELECT id, name FROM group_members 
+        WHERE group_id = ${groupId} 
+        ORDER BY id ASC`;
+        
+      const logs = await sql`
+        SELECT member_name, check_date FROM tongdok_logs 
+        WHERE group_id = ${groupId} 
+        ORDER BY check_date ASC`;
+      
+      return res.status(200).json({ members, logs });
+    }
 
     // 3. 데이터 저장 및 변경 (POST)
     if (req.method === 'POST') {
@@ -79,21 +78,14 @@ if (req.method === 'GET') {
       }
 
       // [Action B] 날짜별 성경통독 체크박스 ON
+      // 전체 진도율은 이제 로그를 직접 세므로, 별도 카운터 증가가 필요 없음.
       if (action === 'check') {
         const { name, date } = req.body;
 
-        // 중복 체크를 방지하며 INSERT 실행
-        const insertResult = await sql`
+        await sql`
           INSERT INTO tongdok_logs (group_id, member_name, check_date)
           VALUES (${groupId}, ${name}, ${date})
           ON CONFLICT (group_id, member_name, check_date) DO NOTHING
-        `;
-
-        // 가짜 혹은 중복 호출이 아닐 때만 글로벌 카운트 +1 처리
-        await sql`
-          UPDATE global_counter 
-          SET current_count = current_count + 1 
-          WHERE counter_name = 'global_tongdok_count'
         `;
 
         const logs = await sql`SELECT member_name, check_date FROM tongdok_logs WHERE group_id = ${groupId}`;
@@ -104,24 +96,10 @@ if (req.method === 'GET') {
       if (action === 'uncheck') {
         const { name, date } = req.body;
 
-        // 삭제 전 데이터가 실제 존재하는지 확인 후 차감 처리
-        const checkExist = await sql`
-          SELECT id FROM tongdok_logs 
+        await sql`
+          DELETE FROM tongdok_logs 
           WHERE group_id = ${groupId} AND member_name = ${name} AND check_date = ${date}
         `;
-
-        if (checkExist.length > 0) {
-          await sql`
-            DELETE FROM tongdok_logs 
-            WHERE group_id = ${groupId} AND member_name = ${name} AND check_date = ${date}
-          `;
-          
-          await sql`
-            UPDATE global_counter 
-            SET current_count = current_count - 1 
-            WHERE counter_name = 'global_tongdok_count'
-          `;
-        }
 
         const logs = await sql`SELECT member_name, check_date FROM tongdok_logs WHERE group_id = ${groupId}`;
         return res.status(200).json({ success: true, logs });
