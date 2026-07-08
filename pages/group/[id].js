@@ -59,6 +59,21 @@ const getTodayGlobalIndex = () => {
 };
 // ─────────────────────────────────────────────────────
 
+// 실제 운영되는 94개 조 ID 목록. 17·22·26조는 인원이 많아 A/B로 나뉘어 있음
+// (예: '17A', '17B') → 총 91개 번호 - 3개(분리) + 6개(A/B) = 94개 방
+const SPLIT_GROUPS = new Set([17, 22, 26]);
+const ALL_GROUP_IDS = (() => {
+  const ids = [];
+  for (let i = 1; i <= 91; i++) {
+    if (SPLIT_GROUPS.has(i)) {
+      ids.push(i + 'A', i + 'B');
+    } else {
+      ids.push(String(i));
+    }
+  }
+  return ids;
+})();
+
 export default function GroupDashboard() {
   const router = useRouter();
   const { id: queryId } = router.query;
@@ -335,8 +350,8 @@ export default function GroupDashboard() {
           <div className="flex justify-end items-center gap-2 mb-4">
             <span className="text-xs text-[#52525B]">타 조 갤러리 순회:</span>
             <select value={selectedGroupToggle} onChange={handleGroupToggleChange} className="bg-[#121215] border border-[#27272A] rounded-lg px-3 py-1.5 text-xs text-[#A1A1AA] focus:outline-none focus:border-[#E67E22]">
-              {Array.from({ length: 90 }).map((_, i) => (
-                <option key={i+1} value={i+1}>{i+1}조 갤러리</option>
+              {ALL_GROUP_IDS.map((gid) => (
+                <option key={gid} value={gid}>{gid}조 갤러리</option>
               ))}
             </select>
           </div>
@@ -369,7 +384,7 @@ export default function GroupDashboard() {
           <div className="text-5xl font-black text-[#E67E22] mt-1 tracking-tighter">{progressPercent}%</div>
         </div>
 
-        {activeTab === '우리 조 작품' && Number(selectedGroupToggle) === Number(groupId) && (
+        {activeTab === '우리 조 작품' && String(selectedGroupToggle) === String(groupId) && (
           <div className="bg-[#121215] p-6 rounded-2xl border border-[#1F1F23] shadow-xl">
             <div className="mb-4">
               <h3 className="text-base font-bold text-[#F4F4F5] flex items-center gap-2">
@@ -391,9 +406,11 @@ export default function GroupDashboard() {
                     {Array.from({ length: targetDays }).map((_, i) => {
                       // 주간 구분선: 토요일(한 주의 마지막 통독일) 오른쪽에 얇은 선
                       const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
+                      // 저장은 여전히 일차(1,2,3…) 기준이지만, 화면엔 실제 날짜 숫자만 표시 (일요일 제외)
+                      const displayDate = readingDates[i] ? readingDates[i].getDate() : i + 1;
                       return (
                         <th key={i} className={'py-3 px-2 min-w-[48px] font-mono text-[#71717A]' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
-                          {i + 1}일
+                          {displayDate}
                         </th>
                       );
                     })}
