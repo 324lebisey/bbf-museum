@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
 const TOTAL_DAYS_BY_MONTH = {
-  '7월': 27, '8월': 26, '9월': 26, '10월': 27, '11월': 25
+  '7월': 27, '8월': 26, '9월': 26, '10월': 27, '11월': 23
 };
 const TOTAL_150_DAYS = 131; 
 
