@@ -228,8 +228,10 @@ export default function GroupDashboard() {
   const groupTargetGoal = activeMemberCount * targetDays;
   
   const monthString = currentMonth.replace('월', '').padStart(2, '0');
-  const groupCurrentChecked = logs.filter(l => l.check_date.includes('-' + monthString + '-')).length;
-
+  const currentNames = new Set(members.map(m => m.name));
+  const groupCurrentChecked = logs.filter(
+    l => currentNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
+  ).length;
   // 주간 구분선용: [i] = (i+1)일차의 실제 달력 날짜
   const readingDates = getReadingDates(currentMonth);
 
