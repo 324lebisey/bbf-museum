@@ -122,8 +122,8 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
 
   return (
     <div className="mt-12">
-      <div className="w-full max-w-xs mx-auto border-t border-[#27272A] mb-5" />
-      <div className="text-[14px] font-bold text-[#52525B] font-mono tracking-widest uppercase mb-3 text-center">
+      <div className="w-full max-w-xs mx-auto border-t border-[#27272A] mb-8" />
+      <div className="text-[15px] font-bold text-[#52525B] font-mono tracking-widest uppercase mb-3 text-center">
         94개조 진행 현황
       </div>
       <div
