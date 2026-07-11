@@ -75,8 +75,19 @@ const ALL_GROUP_IDS = (() => {
 })();
 
 // ── 94개조 모자이크 컴포넌트: 이달의 명화 아래, 조별 진행률을 타일로 표시 ──
-const MOSAIC_COLS = 14;
 const MOSAIC_ROWS = 7;
+
+// 94를 7행에 최대한 고르게 나눔 (예: 14,14,14,13,13,13,13 = 94) → 빈칸 없이 꽉 채움
+function buildMosaicRowCounts(total, rows) {
+  const base = Math.floor(total / rows);
+  const remainder = total - base * rows;
+  const counts = [];
+  for (let r = 0; r < rows; r++) {
+    counts.push(base + (r < remainder ? 1 : 0));
+  }
+  return counts;
+}
+const MOSAIC_ROW_COUNTS = buildMosaicRowCounts(94, MOSAIC_ROWS);
 
 function GroupMosaic({ month, paintingSrc, currentGroupId }) {
   const [mosaicGroups, setMosaicGroups] = useState([]);
@@ -92,48 +103,65 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
 
   if (mosaicGroups.length === 0) return null;
 
+  let idx = 0;
+
   return (
     <div className="mt-8">
       <div className="text-[11px] text-[#52525B] font-mono tracking-widest uppercase mb-3 text-center">
         94개조 진행 현황
       </div>
       <div
-        className="relative w-full rounded-xl overflow-hidden border border-[#27272A]"
-        style={{
-          aspectRatio: '16/9',
-          display: 'grid',
-          gridTemplateColumns: `repeat(${MOSAIC_COLS}, 1fr)`,
-          gridTemplateRows: `repeat(${MOSAIC_ROWS}, 1fr)`,
-          gap: 1,
-          background: '#1F1F23',
-        }}
+        className="relative w-full rounded-xl overflow-hidden border border-[#27272A] flex flex-col"
+        style={{ aspectRatio: '16/9', background: '#000' }}
         onMouseLeave={() => setHoverGroup(null)}
       >
-        {mosaicGroups.map((g, i) => {
-          const bgPosX = (i % MOSAIC_COLS) / (MOSAIC_COLS - 1) * 100;
-          const bgPosY = Math.floor(i / MOSAIC_COLS) / (MOSAIC_ROWS - 1) * 100;
-          const pct = g.percent;
-          const isSelf = String(g.groupId) === String(currentGroupId);
-          return (
-            <div
-              key={g.groupId}
-              onMouseEnter={() => setHoverGroup(g)}
-              onClick={() => { window.location.href = `/?id=${g.groupId}`; }}
-              className="relative cursor-pointer"
-              style={{
-                backgroundImage: `url(${paintingSrc})`,
-                backgroundSize: `${MOSAIC_COLS * 100}% ${MOSAIC_ROWS * 100}%`,
-                backgroundPosition: `${bgPosX}% ${bgPosY}%`,
-                filter: `grayscale(${100 - pct}%) brightness(${0.55 + pct / 250})`,
-                outline: isSelf ? '2px solid #E67E22' : 'none',
-                outlineOffset: isSelf ? '-2px' : 0,
-              }}
-            />
-          );
-        })}
+        {MOSAIC_ROW_COUNTS.map((colCount, rowIdx) => (
+          <div key={rowIdx} className="flex" style={{ flex: 1 }}>
+            {Array.from({ length: colCount }).map((_, colIdx) => {
+              const g = mosaicGroups[idx];
+              idx += 1;
+              if (!g) return null;
+
+              const pct = g.percent;
+              const isSelf = String(g.groupId) === String(currentGroupId);
+              const isZero = pct <= 0;
+
+              const bgPosX = colCount > 1 ? (colIdx / (colCount - 1)) * 100 : 0;
+              const bgPosY = MOSAIC_ROWS > 1 ? (rowIdx / (MOSAIC_ROWS - 1)) * 100 : 0;
+
+              return (
+                <div
+                  key={g.groupId}
+                  onMouseEnter={() => setHoverGroup(g)}
+                  onClick={() => { window.location.href = `/?id=${g.groupId}`; }}
+                  className="relative cursor-pointer"
+                  style={{
+                    flex: 1,
+                    border: '0.5px solid rgba(0,0,0,0.5)',
+                    background: isZero ? '#050505' : undefined,
+                    backgroundImage: isZero ? 'none' : `url(${paintingSrc})`,
+                    backgroundSize: isZero ? undefined : `${colCount * 100}% ${MOSAIC_ROWS * 100}%`,
+                    backgroundPosition: isZero ? undefined : `${bgPosX}% ${bgPosY}%`,
+                    filter: isZero ? 'none' : `grayscale(${100 - pct}%) brightness(${0.55 + pct / 250})`,
+                    outline: isSelf ? '3px solid #FFA94D' : 'none',
+                    outlineOffset: isSelf ? '-3px' : 0,
+                    boxShadow: isSelf ? '0 0 8px 1px rgba(255,169,77,0.7)' : 'none',
+                    zIndex: isSelf ? 2 : 1,
+                  }}
+                />
+              );
+            })}
+          </div>
+        ))}
       </div>
-      <div className="h-5 text-center text-xs text-[#A1A1AA] mt-2">
-        {hoverGroup ? `${hoverGroup.groupId}조 · ${hoverGroup.percent}%` : ''}
+      <div className="h-7 text-center mt-2">
+        {hoverGroup && (
+          <span>
+            <span className="text-sm font-bold text-[#D4D4D8]">{hoverGroup.groupId}조</span>
+            <span className="text-sm text-[#52525B]"> · </span>
+            <span className="text-lg font-black text-[#E67E22]">{hoverGroup.percent}%</span>
+          </span>
+        )}
       </div>
     </div>
   );
