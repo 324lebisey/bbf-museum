@@ -74,6 +74,71 @@ const ALL_GROUP_IDS = (() => {
   return ids;
 })();
 
+// ── 94개조 모자이크 컴포넌트: 이달의 명화 아래, 조별 진행률을 타일로 표시 ──
+const MOSAIC_COLS = 14;
+const MOSAIC_ROWS = 7;
+
+function GroupMosaic({ month, paintingSrc, currentGroupId }) {
+  const [mosaicGroups, setMosaicGroups] = useState([]);
+  const [hoverGroup, setHoverGroup] = useState(null);
+
+  useEffect(() => {
+    if (!month) return;
+    fetch(`/api/tongdok?allGroups=true&month=${month}&_cb=${Date.now()}`)
+      .then((r) => r.json())
+      .then((data) => setMosaicGroups(data.groups || []))
+      .catch(() => setMosaicGroups([]));
+  }, [month]);
+
+  if (mosaicGroups.length === 0) return null;
+
+  return (
+    <div className="mt-8">
+      <div className="text-[11px] text-[#52525B] font-mono tracking-widest uppercase mb-3 text-center">
+        94개조 진행 현황
+      </div>
+      <div
+        className="relative w-full rounded-xl overflow-hidden border border-[#27272A]"
+        style={{
+          aspectRatio: '16/9',
+          display: 'grid',
+          gridTemplateColumns: `repeat(${MOSAIC_COLS}, 1fr)`,
+          gridTemplateRows: `repeat(${MOSAIC_ROWS}, 1fr)`,
+          gap: 1,
+          background: '#1F1F23',
+        }}
+        onMouseLeave={() => setHoverGroup(null)}
+      >
+        {mosaicGroups.map((g, i) => {
+          const bgPosX = (i % MOSAIC_COLS) / (MOSAIC_COLS - 1) * 100;
+          const bgPosY = Math.floor(i / MOSAIC_COLS) / (MOSAIC_ROWS - 1) * 100;
+          const pct = g.percent;
+          const isSelf = String(g.groupId) === String(currentGroupId);
+          return (
+            <div
+              key={g.groupId}
+              onMouseEnter={() => setHoverGroup(g)}
+              onClick={() => { window.location.href = `/?id=${g.groupId}`; }}
+              className="relative cursor-pointer"
+              style={{
+                backgroundImage: `url(${paintingSrc})`,
+                backgroundSize: `${MOSAIC_COLS * 100}% ${MOSAIC_ROWS * 100}%`,
+                backgroundPosition: `${bgPosX}% ${bgPosY}%`,
+                filter: `grayscale(${100 - pct}%) brightness(${0.55 + pct / 250})`,
+                outline: isSelf ? '2px solid #E67E22' : 'none',
+                outlineOffset: isSelf ? '-2px' : 0,
+              }}
+            />
+          );
+        })}
+      </div>
+      <div className="h-5 text-center text-xs text-[#A1A1AA] mt-2">
+        {hoverGroup ? `${hoverGroup.groupId}조 · ${hoverGroup.percent}%` : ''}
+      </div>
+    </div>
+  );
+}
+
 export default function GroupDashboard() {
   const router = useRouter();
   const { id: queryId } = router.query;
@@ -384,6 +449,14 @@ const monthString = currentMonth.replace('월', '').padStart(2, '0');
             {activeTab === '우리 조 작품' ? selectedGroupToggle + '조 ' + currentMonth + ' 진도율' : activeTab + ' 진척도'}
           </div>
           <div className="text-5xl font-black text-[#E67E22] mt-1 tracking-tighter">{progressPercent}%</div>
+
+          {activeTab === '이달의 명화 전시관' && (
+            <GroupMosaic
+              month={'2026-' + currentMonth.replace('월', '').padStart(2, '0')}
+              paintingSrc={ARTWORKS[currentMonth]}
+              currentGroupId={groupId}
+            />
+          )}
         </div>
 
         {activeTab === '우리 조 작품' && String(selectedGroupToggle) === String(groupId) && (
