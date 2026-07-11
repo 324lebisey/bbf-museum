@@ -364,7 +364,7 @@ const monthString = currentMonth.replace('월', '').padStart(2, '0');
     progressPercent = goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
   }
   progressPercent = Math.min(Number(progressPercent), 100).toFixed(1);
-
+const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) >= 100;
   const getMaskStyle = (percent) => {
     if (Number(percent) === 0) return { WebkitMaskImage: 'none', maskImage: 'none', opacity: 0 };
     let maskValue = '';
@@ -478,9 +478,14 @@ const monthString = currentMonth.replace('월', '').padStart(2, '0');
         {/* 10월 확대 시 짤림을 막기 위해 컨테이너 패딩 가변 조정 */}
         <div className={'bg-[#121215] rounded-2xl border border-[#1F1F23] mb-8 text-center shadow-2xl relative transition-all duration-300 ' + (isOctober ? 'p-10 md:p-12' : 'p-5 md:p-8')}>
           
-          {/* 원래 비율은 사수하되, 10월 선택 시에만 scale-110으로 그림을 10% 증폭 */}
-          <div className={'relative mx-auto rounded-xl overflow-hidden border border-[#27272A] inline-block transition-all duration-300 ' + (isOctober ? 'max-w-5xl transform scale-110 shadow-2xl' : isLargeMonth ? 'max-w-5xl' : 'max-w-2xl')}>
-            
+          {/* 원래 비율은 사수하되, 10월 선택 시에만 scale-110으로 그림을 10% 증폭 */} 
+          <div
+            className={'relative mx-auto rounded-xl overflow-hidden border inline-block transition-all duration-300 ' + (isOctober ? 'max-w-5xl transform scale-110 shadow-2xl' : isLargeMonth ? 'max-w-5xl' : 'max-w-2xl') + (isComplete ? ' border-[#FFB366]' : ' border-[#27272A]')}
+            style={isComplete ? {
+              boxShadow: '0 0 40px 8px rgba(255,179,102,0.55), 0 0 90px 20px rgba(255,179,102,0.25)',
+              animation: 'paintingGlowPulse 2.4s ease-in-out infinite',
+            } : undefined}
+          >  
             <img 
               src={ARTWORKS[activeTab === '150일 대장정' ? '150일' : currentMonth]} 
               alt="Museum Base"
