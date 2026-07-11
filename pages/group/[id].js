@@ -75,6 +75,7 @@ const ALL_GROUP_IDS = (() => {
 })();
 
 // ── 94개조 모자이크 컴포넌트: 이달의 명화 아래, 조별 진행률을 타일로 표시 ──
+// ── 94개조 모자이크 컴포넌트: 이달의 명화 아래, 조별 진행률을 타일로 표시 ──
 const MOSAIC_ROWS = 7;
 
 // 94를 7행에 최대한 고르게 나눔 (예: 14,14,14,13,13,13,13 = 94) → 빈칸 없이 꽉 채움
@@ -103,7 +104,21 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
 
   if (mosaicGroups.length === 0) return null;
 
+  // 우리 조 타일의 위치(행/열)를 먼저 찾아서, 오버레이 좌표 계산에 씀
   let idx = 0;
+  let selfPos = null; // { rowIdx, colIdx, colCount }
+  const rows = MOSAIC_ROW_COUNTS.map((colCount, rowIdx) => {
+    const items = Array.from({ length: colCount }).map((_, colIdx) => {
+      const g = mosaicGroups[idx];
+      const currentIdx = idx;
+      idx += 1;
+      if (g && String(g.groupId) === String(currentGroupId)) {
+        selfPos = { rowIdx, colIdx, colCount };
+      }
+      return { g, currentIdx, colIdx };
+    });
+    return { colCount, items };
+  });
 
   return (
     <div className="mt-8">
@@ -115,17 +130,12 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
         style={{ aspectRatio: '16/9', background: '#000' }}
         onMouseLeave={() => setHoverGroup(null)}
       >
-        {MOSAIC_ROW_COUNTS.map((colCount, rowIdx) => (
+        {rows.map(({ colCount, items }, rowIdx) => (
           <div key={rowIdx} className="flex" style={{ flex: 1 }}>
-            {Array.from({ length: colCount }).map((_, colIdx) => {
-              const g = mosaicGroups[idx];
-              idx += 1;
+            {items.map(({ g, colIdx }) => {
               if (!g) return null;
-
               const pct = g.percent;
-              const isSelf = String(g.groupId) === String(currentGroupId);
               const isZero = pct <= 0;
-
               const bgPosX = colCount > 1 ? (colIdx / (colCount - 1)) * 100 : 0;
               const bgPosY = MOSAIC_ROWS > 1 ? (rowIdx / (MOSAIC_ROWS - 1)) * 100 : 0;
 
@@ -143,23 +153,36 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
                     backgroundSize: isZero ? undefined : `${colCount * 100}% ${MOSAIC_ROWS * 100}%`,
                     backgroundPosition: isZero ? undefined : `${bgPosX}% ${bgPosY}%`,
                     filter: isZero ? 'none' : `grayscale(${100 - pct}%) brightness(${0.55 + pct / 250})`,
-                    outline: isSelf ? '3px solid #FFA94D' : 'none',
-                    outlineOffset: isSelf ? '-3px' : 0,
-                    boxShadow: isSelf ? '0 0 8px 1px rgba(255,169,77,0.7)' : 'none',
-                    zIndex: isSelf ? 2 : 1,
                   }}
                 />
               );
             })}
           </div>
         ))}
+
+        {/* 우리 조 하이라이트: 별도 최상단 레이어라 절대 안 가려짐 */}
+        {selfPos && (
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: `${(selfPos.colIdx / selfPos.colCount) * 100}%`,
+              top: `${(selfPos.rowIdx / MOSAIC_ROWS) * 100}%`,
+              width: `${(1 / selfPos.colCount) * 100}%`,
+              height: `${(1 / MOSAIC_ROWS) * 100}%`,
+              border: '3px solid #FFB366',
+              boxShadow: '0 0 12px 2px rgba(255,179,102,0.9), inset 0 0 8px 1px rgba(255,179,102,0.5)',
+              zIndex: 10,
+            }}
+          />
+        )}
       </div>
-      <div className="h-7 text-center mt-2">
+
+      <div className="h-8 text-center mt-2">
         {hoverGroup && (
           <span>
-            <span className="text-sm font-bold text-[#D4D4D8]">{hoverGroup.groupId}조</span>
-            <span className="text-sm text-[#52525B]"> · </span>
-            <span className="text-lg font-black text-[#E67E22]">{hoverGroup.percent}%</span>
+            <span style={{ fontSize: '17px' }} className="font-bold text-[#D4D4D8]">{hoverGroup.groupId}조</span>
+            <span style={{ fontSize: '17px' }} className="text-[#52525B]"> · </span>
+            <span style={{ fontSize: '22px' }} className="font-black text-[#E67E22]">{hoverGroup.percent}%</span>
           </span>
         )}
       </div>
