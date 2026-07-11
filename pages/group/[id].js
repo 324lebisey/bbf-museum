@@ -144,7 +144,7 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
                 <div
                   key={g.groupId}
                   onMouseEnter={() => setHoverGroup(g)}
-                  onClick={() => { window.location.href = `/?id=${g.groupId}`; }}
+                  onClick={() => { window.location.href = `/group/${g.groupId}`; }}
                   className="relative cursor-pointer"
                   style={{
                     flex: 1,
