@@ -122,7 +122,7 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
 
   return (
     <div className="mt-8">
-      <div className="text-[11px] text-[#52525B] font-mono tracking-widest uppercase mb-3 text-center">
+      <div className="text-[15px] text-[#52525B] font-mono tracking-widest uppercase mb-3 text-center">
         94개조 진행 현황
       </div>
       <div
@@ -501,7 +501,7 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
 
           </div>
           {/* 그림이 확대되었을 때 수치 마진이 겹치지 않도록 간격 최적화 */}
-          <div className={'text-[11px] text-[#52525B] font-mono tracking-widest uppercase transition-all ' + (isOctober ? 'mt-10' : 'mt-6')}>
+          <div className={'text-[15px] text-[#52525B] font-mono tracking-widest uppercase transition-all ' + (isOctober ? 'mt-10' : 'mt-6')}>
             {activeTab === '우리 조 작품' ? selectedGroupToggle + '조 ' + currentMonth + ' 진도율' : activeTab + ' 진척도'}
           </div>
           <div className="text-5xl font-black text-[#E67E22] mt-1 tracking-tighter">{progressPercent}%</div>
