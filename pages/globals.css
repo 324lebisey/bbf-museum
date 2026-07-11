@@ -24,3 +24,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes paintingGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 40px 8px rgba(255,179,102,0.55), 0 0 90px 20px rgba(255,179,102,0.25);
+  }
+  50% {
+    box-shadow: 0 0 55px 14px rgba(255,179,102,0.75), 0 0 120px 30px rgba(255,179,102,0.35);
+  }
+}
