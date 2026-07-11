@@ -1,5 +1,44 @@
 import { neon } from '@neondatabase/serverless';
 
+// ── GroupDashboard.js와 동일한 로직 (일차 계산 + 비활성 판정) ──
+const TOTAL_DAYS_BY_MONTH = { '7월': 27, '8월': 26, '9월': 26, '10월': 27, '11월': 23 };
+const MONTH_ORDER = ['7월', '8월', '9월', '10월', '11월'];
+const SPLIT_GROUPS = new Set([17, 22, 26]);
+const ALL_GROUP_IDS = (() => {
+  const ids = [];
+  for (let i = 1; i <= 91; i++) {
+    if (SPLIT_GROUPS.has(i)) ids.push(i + 'A', i + 'B');
+    else ids.push(String(i));
+  }
+  return ids;
+})();
+
+function toGlobalIndex(checkDate) {
+  const [, mm, dd] = checkDate.split('-').map(Number);
+  let idx = 0;
+  for (const label of MONTH_ORDER) {
+    if (Number(label.replace('월', '')) < mm) idx += TOTAL_DAYS_BY_MONTH[label];
+  }
+  return idx + dd;
+}
+
+function getTodayGlobalIndex() {
+  const today = new Date();
+  const mm = today.getMonth() + 1;
+  let idx = 0;
+  for (const label of MONTH_ORDER) {
+    const m = Number(label.replace('월', ''));
+    if (m < mm) { idx += TOTAL_DAYS_BY_MONTH[label]; continue; }
+    if (m === mm) {
+      for (let d = 1; d <= today.getDate(); d++) {
+        if (new Date(2026, m - 1, d).getDay() !== 0) idx++;
+      }
+    }
+    break;
+  }
+  return idx;
+}
+
 export default async function handler(req, res) {
   // Neon 환경변수 체크
   if (!process.env.DATABASE_URL) {
@@ -7,7 +46,7 @@ export default async function handler(req, res) {
   }
 
   const sql = neon(process.env.DATABASE_URL);
-  const { groupId, global, month } = req.query;
+  const { groupId, global, allGroups, month } = req.query;
 
   try {
     // 1. 전체 진도율 집계 (이달의 명화 / 150일 대장정용)
@@ -40,6 +79,73 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ globalCount: count, totalPeople: people });
+    }
+
+    // 1.5 94개조 모자이크용: 각 조의 이달 진행률을 한 번에 계산해서 반환
+    //     GroupDashboard.js의 '우리 조 작품' 계산과 완전히 동일한 로직
+    //     (isInactive → activeNames → 진행률) 을 94개 조에 대해 반복
+    if (allGroups === 'true') {
+      if (!month) {
+        return res.status(400).json({ error: 'month 파라미터가 필요합니다. 예: 2026-08' });
+      }
+      const mm = Number(month.split('-')[1]);
+      const monthLabel = mm + '월';
+      const targetDays = TOTAL_DAYS_BY_MONTH[monthLabel];
+      if (!targetDays) {
+        return res.status(400).json({ error: '알 수 없는 월입니다: ' + monthLabel });
+      }
+      const monthString = String(mm).padStart(2, '0');
+
+      const allMembers = await sql`SELECT group_id, name FROM group_members`;
+      const allLogs = await sql`SELECT group_id, member_name, check_date FROM tongdok_logs`;
+
+      const membersByGroup = {};
+      for (const m of allMembers) {
+        if (!membersByGroup[m.group_id]) membersByGroup[m.group_id] = [];
+        membersByGroup[m.group_id].push(m);
+      }
+      const logsByGroup = {};
+      for (const l of allLogs) {
+        if (!logsByGroup[l.group_id]) logsByGroup[l.group_id] = [];
+        logsByGroup[l.group_id].push(l);
+      }
+
+      const todayGlobal = getTodayGlobalIndex();
+      const isTodayReadingDay = new Date().getDay() !== 0;
+
+      const groups = ALL_GROUP_IDS.map((gid) => {
+        const groupMembers = membersByGroup[gid] || [];
+        const groupLogs = logsByGroup[gid] || [];
+
+        const processed = groupMembers.map((m) => {
+          const memberLogs = groupLogs.filter((l) => l.member_name === m.name);
+          let isInactive = false;
+          if (memberLogs.length > 0) {
+            const latestGlobal = Math.max(...memberLogs.map((l) => toGlobalIndex(l.check_date)));
+            const missed = Math.max(todayGlobal - latestGlobal - (isTodayReadingDay ? 1 : 0), 0);
+            if (missed >= 5) isInactive = true;
+          } else {
+            isInactive = true;
+          }
+          return { name: m.name, isInactive };
+        });
+
+        const activeNames = new Set(processed.filter((m) => !m.isInactive).map((m) => m.name));
+        const activeCount = activeNames.size;
+        const groupTargetGoal = activeCount * targetDays;
+
+        const groupCurrentChecked = groupLogs.filter(
+          (l) => activeNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
+        ).length;
+
+        const percent = groupTargetGoal > 0
+          ? Math.min((groupCurrentChecked / groupTargetGoal) * 100, 100)
+          : 0;
+
+        return { groupId: gid, percent: Number(percent.toFixed(1)) };
+      });
+
+      return res.status(200).json({ groups });
     }
 
     if (!groupId) {
