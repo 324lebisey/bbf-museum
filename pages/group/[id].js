@@ -227,10 +227,10 @@ export default function GroupDashboard() {
   const targetDays = TOTAL_DAYS_BY_MONTH[currentMonth] || 30;
   const groupTargetGoal = activeMemberCount * targetDays;
   
-  const monthString = currentMonth.replace('월', '').padStart(2, '0');
-  const currentNames = new Set(members.map(m => m.name));
+const monthString = currentMonth.replace('월', '').padStart(2, '0');
+  const activeNames = new Set(processedMembers.filter(m => !m.isInactive).map(m => m.name));
   const groupCurrentChecked = logs.filter(
-    l => currentNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
+    l => activeNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
   ).length;
   // 주간 구분선용: [i] = (i+1)일차의 실제 달력 날짜
   const readingDates = getReadingDates(currentMonth);
