@@ -14,21 +14,28 @@ export default async function handler(req, res) {
     //    - month('2026-08' 형식)가 있으면 그 달의 로그만, 없으면 전체(150일)를 실제로 COUNT.
     //    - 단일 카운터(global_counter) 방식은 폐기 → 중복 클릭으로 숫자가 부풀던 드리프트가 사라짐.
     //    - totalPeople(현재 등록 인원)을 함께 반환 → 프론트에서 분모로 사용, 이탈 시 목표 자동 감소.
-    if (global === 'true') {
+   if (global === 'true') {
       const peopleResult = await sql`SELECT COUNT(*)::int AS people FROM group_members`;
       const people = peopleResult[0]?.people || 0;
 
       let count = 0;
       if (month) {
-        // check_date는 '2026-MM-일차' 문자열이므로 prefix 매칭으로 그 달만 집계
         const prefix = month + '-%';
         const r = await sql`
-          SELECT COUNT(*)::int AS c FROM tongdok_logs
-          WHERE check_date LIKE ${prefix}
+          SELECT COUNT(*)::int AS c
+          FROM tongdok_logs tl
+          JOIN group_members gm
+            ON gm.group_id = tl.group_id AND gm.name = tl.member_name
+          WHERE tl.check_date LIKE ${prefix}
         `;
         count = r[0]?.c || 0;
       } else {
-        const r = await sql`SELECT COUNT(*)::int AS c FROM tongdok_logs`;
+        const r = await sql`
+          SELECT COUNT(*)::int AS c
+          FROM tongdok_logs tl
+          JOIN group_members gm
+            ON gm.group_id = tl.group_id AND gm.name = tl.member_name
+        `;
         count = r[0]?.c || 0;
       }
 
