@@ -93,6 +93,7 @@ const MOSAIC_ROW_COUNTS = buildMosaicRowCounts(94, MOSAIC_ROWS);
 function GroupMosaic({ month, paintingSrc, currentGroupId }) {
   const [mosaicGroups, setMosaicGroups] = useState([]);
   const [hoverGroup, setHoverGroup] = useState(null);
+  const [tappedGroupId, setTappedGroupId] = useState(null); // 모바일: 1차 탭한 타일
 
   useEffect(() => {
     if (!month) return;
@@ -104,32 +105,42 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
 
   if (mosaicGroups.length === 0) return null;
 
-  // 우리 조 타일의 위치(행/열)를 먼저 찾아서, 오버레이 좌표 계산에 씀
+  const handleTileClick = (g) => {
+    // 1차 탭: 정보만 표시. 같은 타일을 다시 탭하면 그때 이동.
+    if (tappedGroupId === g.groupId) {
+      window.location.href = `/?id=${g.groupId}`;
+      return;
+    }
+    setTappedGroupId(g.groupId);
+    setHoverGroup(g);
+  };
+
   let idx = 0;
-  let selfPos = null; // { rowIdx, colIdx, colCount }
+  let selfPos = null;
   const rows = MOSAIC_ROW_COUNTS.map((colCount, rowIdx) => {
     const items = Array.from({ length: colCount }).map((_, colIdx) => {
       const g = mosaicGroups[idx];
-      const currentIdx = idx;
       idx += 1;
       if (g && String(g.groupId) === String(currentGroupId)) {
         selfPos = { rowIdx, colIdx, colCount };
       }
-      return { g, currentIdx, colIdx };
+      return { g, colIdx };
     });
     return { colCount, items };
   });
 
+  const displayGroup = hoverGroup;
+
   return (
     <div className="mt-12">
-      <div className="w-full max-w-xs mx-auto border-t border-[#27272A] mb-12" />
-      <div className="text-[15px] font-bold text-[#52525B] font-mono tracking-widest uppercase mb-3 text-center">
+      <div className="w-full max-w-xs mx-auto border-t border-[#27272A] mb-8" />
+      <div className="text-[14px] font-bold text-[#52525B] font-mono tracking-widest uppercase mb-3 text-center">
         94개조 진행 현황
       </div>
       <div
         className="relative w-full rounded-xl overflow-hidden border border-[#27272A] flex flex-col"
         style={{ aspectRatio: '16/9', background: '#000' }}
-        onMouseLeave={() => setHoverGroup(null)}
+        onMouseLeave={() => { setHoverGroup(null); }}
       >
         {rows.map(({ colCount, items }, rowIdx) => (
           <div key={rowIdx} className="flex" style={{ flex: 1 }}>
@@ -144,7 +155,7 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
                 <div
                   key={g.groupId}
                   onMouseEnter={() => setHoverGroup(g)}
-                  onClick={() => { window.location.href = `/group/${g.groupId}`; }}
+                  onClick={() => handleTileClick(g)}
                   className="relative cursor-pointer"
                   style={{
                     flex: 1,
@@ -161,7 +172,6 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
           </div>
         ))}
 
-        {/* 우리 조 하이라이트: 별도 최상단 레이어라 절대 안 가려짐 */}
         {selfPos && (
           <div
             className="absolute pointer-events-none"
@@ -179,14 +189,19 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
       </div>
 
       <div className="h-8 text-center mt-2">
-        {hoverGroup && (
+        {displayGroup && (
           <span>
-            <span style={{ fontSize: '17px' }} className="font-bold text-[#D4D4D8]">{hoverGroup.groupId}조</span>
+            <span style={{ fontSize: '17px' }} className="font-bold text-[#D4D4D8]">{displayGroup.groupId}조</span>
             <span style={{ fontSize: '17px' }} className="text-[#52525B]"> · </span>
-            <span style={{ fontSize: '22px' }} className="font-black text-[#E67E22]">{hoverGroup.percent}%</span>
+            <span style={{ fontSize: '22px' }} className="font-black text-[#E67E22]">{displayGroup.percent}%</span>
           </span>
         )}
       </div>
+      {tappedGroupId && (
+        <div className="text-center text-[11px] text-[#52525B] mt-1">
+          한 번 더 탭하면 {tappedGroupId}조로 이동합니다
+        </div>
+      )}
     </div>
   );
 }
