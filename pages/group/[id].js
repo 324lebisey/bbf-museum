@@ -108,7 +108,7 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
   const handleTileClick = (g) => {
     // 1차 탭: 정보만 표시. 같은 타일을 다시 탭하면 그때 이동.
     if (tappedGroupId === g.groupId) {
-      window.location.href = `/?id=${g.groupId}`;
+      window.location.href = `/group/${g.groupId}`;
       return;
     }
     setTappedGroupId(g.groupId);
@@ -134,7 +134,7 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
   return (
     <div className="mt-12">
       <div className="w-full max-w-xs mx-auto border-t border-[#27272A] mb-8" />
-      <div className="text-[14px] font-bold text-[#52525B] font-mono tracking-widest uppercase mb-3 text-center">
+      <div className="text-[15px] font-bold text-[#52525B] font-mono tracking-widest uppercase mb-3 text-center">
         94개조 진행 현황
       </div>
       <div
@@ -198,7 +198,7 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
         )}
       </div>
       {tappedGroupId && (
-        <div className="text-center text-[11px] text-[#52525B] mt-1">
+        <div className="text-center text-[15px] text-[#52525B] mt-1">
           한 번 더 탭하면 {tappedGroupId}조로 이동합니다
         </div>
       )}
