@@ -644,9 +644,8 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
             })}
           </tr>
         ))}
-      </tbody>
-    </table>
-  </div>
-</div>
-  )
+</tbody>
+                </table>
+              </div>
+            </div> </div> )} </div> </div> );
 }
