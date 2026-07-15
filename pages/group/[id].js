@@ -574,8 +574,8 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
             <div className="overflow-x-auto rounded-xl border border-[#1F1F23] bg-[#0E0E11]">
               <table className="w-full text-sm text-center">
                 <thead>
-                  <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-xs font-bold">
-                    <th className="py-3 px-4 text-left sticky left-0 bg-[#141416] text-[#A1A1AA] z-10 border-r border-[#1F1F23]">이름</th>
+                  <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-s font-bold sticky top-0 z-20">
+                    <th className="py-3 px-4 text-left sticky left-0 top-0 bg-[#141416] text-[#A1A1AA] z-30 border-r border-[#1F1F23]">이름</th>
                     {Array.from({ length: targetDays }).map((_, i) => {
                       // 주간 구분선: 토요일(한 주의 마지막 통독일) 오른쪽에 얇은 선
                       const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
