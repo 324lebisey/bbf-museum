@@ -217,7 +217,7 @@ export default function GroupDashboard() {
       headerScrollRef.current.scrollLeft = bodyScrollRef.current.scrollLeft;
     }
   };
-  const NAME_COL_WIDTH = 120; // 이름 4글자가 한 줄에 들어가도록 넉넉히
+  const NAME_COL_WIDTH = 88; // 한글 4글자 + 좌우 패딩에 딱 맞는 폭
   const DAY_COL_WIDTH = 48;
 
   const [activeTab, setActiveTab] = useState('우리 조 작품');
@@ -429,11 +429,11 @@ export default function GroupDashboard() {
     } else {
       switch(currentMonth) {
         case '7월': {
-          // 맞닿은 손끝 사이(41% 47%)에서 아주 작게 시작 → 진행률만큼 선형으로 커짐
-          // (기존 35% → 41%로 오른쪽 이동: 아담과 하나님 손끝이 만나는 지점으로 정확히 맞춤)
+          // 맞닿은 손끝 사이(38% 47%)에서 아주 작게 시작 → 진행률만큼 선형으로 커짐
+          // (아담 손=35%, 하나님 손=41% 사이 정중앙 38%: 두 손끝이 맞닿는 지점)
           const jCore = Number(percent);   // 완전 밝은 반경 (진행률 1:1)
           const jEdge = jCore + 5;          // 페이드 폭 (작을수록 시작 원이 더 조여짐)
-          maskValue = 'radial-gradient(circle at 41% 47%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
+          maskValue = 'radial-gradient(circle at 38% 47%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
           break;
         }
         case '8월': {
@@ -582,9 +582,10 @@ export default function GroupDashboard() {
               <button onClick={handleRegisterMembers} className="bg-[#E67E22] hover:bg-[#D35400] text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-[#E67E22]/10">명단 저장</button>
             </div>
 
-            <div className="rounded-xl border border-[#1F1F23] bg-[#0E0E11] overflow-hidden">
-              {/* 날짜 헤더 — 별도 div, sticky top-0으로 페이지 스크롤 기준 고정 */}
-              <div ref={headerScrollRef} className="overflow-x-hidden sticky top-0 z-20 bg-[#141416]">
+            <div className="rounded-xl border border-[#1F1F23] bg-[#0E0E11]">
+              {/* 날짜 헤더 — 별도 div, sticky top-0으로 페이지(뷰포트) 스크롤 기준 고정.
+                  ※ 부모에 overflow-hidden/auto가 있으면 sticky가 그 박스에 갇혀 무효화되므로 절대 넣지 말 것. */}
+              <div ref={headerScrollRef} className="overflow-x-hidden sticky top-0 z-20 bg-[#141416] rounded-t-xl">
                 <table style={{ tableLayout: 'fixed', width: NAME_COL_WIDTH + targetDays * DAY_COL_WIDTH }} className="text-sm text-center">
                   <colgroup>
                     <col style={{ width: NAME_COL_WIDTH }} />
@@ -615,7 +616,7 @@ export default function GroupDashboard() {
               </div>
 
               {/* 표 본문 — 가로 스크롤은 여기서만, 세로는 페이지 스크롤 그대로 */}
-              <div ref={bodyScrollRef} onScroll={handleBodyScroll} className="overflow-x-auto">
+              <div ref={bodyScrollRef} onScroll={handleBodyScroll} className="overflow-x-auto rounded-b-xl">
                 <table style={{ tableLayout: 'fixed', width: NAME_COL_WIDTH + targetDays * DAY_COL_WIDTH }} className="text-sm text-center">
                   <colgroup>
                     <col style={{ width: NAME_COL_WIDTH }} />
