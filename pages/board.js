@@ -18,6 +18,12 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const pad = (n) => String(n).padStart(2, '0');
 const dateKey = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
 
+const TABS = [
+  { key: 'all', label: '전체' },
+  { key: 'upcoming', label: '진행 예정' },
+  { key: 'done', label: '모임완료' },
+];
+
 function buildMonthGrid(year, month) { // month 1-12
   const first = new Date(year, month - 1, 1);
   const startWeekday = first.getDay(); // 0=Sun
@@ -29,9 +35,20 @@ function buildMonthGrid(year, month) { // month 1-12
   return cells;
 }
 
+// 상태 분류: 모임X / 완료(명시 or 날짜 지남) / 진행 예정
+function statusOf(e, todayStr) {
+  const info = (e.meeting_info || '').trim();
+  if (info === '모임X') return 'cancelled';
+  if (info === '모임완료') return 'done';
+  if (e.meeting_date && e.meeting_date < todayStr) return 'done'; // 날짜 지나면 자동 완료
+  return 'upcoming';
+}
+
 export default function Board() {
   const router = useRouter();
   const now = new Date();
+  const todayStr = dateKey(now.getFullYear(), now.getMonth() + 1, now.getDate());
+
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,6 +56,7 @@ export default function Board() {
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1); // 1-12
   const [selectedDate, setSelectedDate] = useState(null); // 'YYYY-MM-DD' | null
+  const [activeTab, setActiveTab] = useState('all');
 
   // 편집 폼 상태
   const [selectedGroup, setSelectedGroup] = useState('');
@@ -46,6 +64,7 @@ export default function Board() {
   const [meetingInfo, setMeetingInfo] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
   const [noMeeting, setNoMeeting] = useState(false);
+  const [done, setDone] = useState(false);
   const [pin, setPin] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -86,35 +105,39 @@ export default function Board() {
     if (existing) {
       setAuthorName(existing.author_name || '');
       setMeetingDate(existing.meeting_date || '');
-      if ((existing.meeting_info || '').trim() === '모임X') {
-        setNoMeeting(true);
-        setMeetingInfo('');
+      const info = (existing.meeting_info || '').trim();
+      if (info === '모임X') {
+        setNoMeeting(true); setDone(false); setMeetingInfo('');
+      } else if (info === '모임완료') {
+        setDone(true); setNoMeeting(false); setMeetingInfo('');
       } else {
-        setNoMeeting(false);
-        setMeetingInfo(existing.meeting_info || '');
+        setNoMeeting(false); setDone(false); setMeetingInfo(existing.meeting_info || '');
       }
     }
   }, [selectedGroup, entries]);
 
-  // 날짜별 모임 집계
+  // 날짜별 모임 집계 (달력용)
   const byDate = useMemo(() => {
     const map = {};
     entries.forEach((e) => {
-      if (e.meeting_date) {
-        (map[e.meeting_date] = map[e.meeting_date] || []).push(e);
-      }
+      if (e.meeting_date) (map[e.meeting_date] = map[e.meeting_date] || []).push(e);
     });
     return map;
   }, [entries]);
 
-  // 아래 목록: 선택 날짜가 있으면 그날만, 없으면 전체(날짜순 → 미정 순)
-  const listEntries = useMemo(() => {
-    if (selectedDate) {
-      return (byDate[selectedDate] || []).slice().sort(
-        (a, b) => (ORDER.get(a.group_id) ?? 999) - (ORDER.get(b.group_id) ?? 999)
-      );
-    }
-    return entries.slice().sort((a, b) => {
+  // 탭별 개수
+  const counts = useMemo(() => {
+    let up = 0, dn = 0;
+    entries.forEach((e) => {
+      const s = statusOf(e, todayStr);
+      if (s === 'upcoming') up++;
+      else if (s === 'done') dn++;
+    });
+    return { all: entries.length, upcoming: up, done: dn };
+  }, [entries, todayStr]);
+
+  const sortEntries = (arr) =>
+    arr.slice().sort((a, b) => {
       const ad = a.meeting_date || '';
       const bd = b.meeting_date || '';
       if (ad && bd && ad !== bd) return ad < bd ? -1 : 1;
@@ -122,7 +145,14 @@ export default function Board() {
       if (!ad && bd) return 1;
       return (ORDER.get(a.group_id) ?? 999) - (ORDER.get(b.group_id) ?? 999);
     });
-  }, [entries, byDate, selectedDate]);
+
+  // 목록: 달력 날짜 선택이 우선, 없으면 탭 필터
+  const listEntries = useMemo(() => {
+    if (selectedDate) return sortEntries(byDate[selectedDate] || []);
+    if (activeTab === 'upcoming') return sortEntries(entries.filter((e) => statusOf(e, todayStr) === 'upcoming'));
+    if (activeTab === 'done') return sortEntries(entries.filter((e) => statusOf(e, todayStr) === 'done'));
+    return sortEntries(entries);
+  }, [entries, byDate, selectedDate, activeTab, todayStr]);
 
   const grid = useMemo(() => buildMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
 
@@ -131,9 +161,7 @@ export default function Board() {
     let y = viewYear;
     if (m < 1) { m = 12; y -= 1; }
     if (m > 12) { m = 1; y += 1; }
-    setViewYear(y);
-    setViewMonth(m);
-    setSelectedDate(null);
+    setViewYear(y); setViewMonth(m); setSelectedDate(null);
   };
 
   const handleSave = async () => {
@@ -141,7 +169,10 @@ export default function Board() {
     if (!authorName.trim()) { setMessage('성함을 입력해주세요.'); return; }
     setSaving(true);
     setMessage('');
-    const info = noMeeting ? '모임X' : meetingInfo.trim();
+    let info, dateToSend;
+    if (noMeeting) { info = '모임X'; dateToSend = ''; }
+    else if (done) { info = '모임완료'; dateToSend = meetingDate; }
+    else { info = meetingInfo.trim(); dateToSend = meetingDate; }
     try {
       const r = await fetch('/api/board', {
         method: 'POST',
@@ -150,7 +181,7 @@ export default function Board() {
           groupId: selectedGroup,
           authorName: authorName.trim(),
           meetingInfo: info,
-          meetingDate: noMeeting ? '' : meetingDate,
+          meetingDate: dateToSend,
           pin: pin.trim(),
         }),
       });
@@ -179,7 +210,7 @@ export default function Board() {
       });
       if (r.status === 403) { setMessage('PIN이 일치하지 않습니다. (명단 저장 때 쓰신 PIN)'); return; }
       if (!r.ok) { setMessage('삭제 중 오류가 발생했습니다.'); return; }
-      setAuthorName(''); setMeetingInfo(''); setMeetingDate(''); setNoMeeting(false); setPin('');
+      setAuthorName(''); setMeetingInfo(''); setMeetingDate(''); setNoMeeting(false); setDone(false); setPin('');
       setMessage('삭제되었습니다.');
       await load();
     } catch (e) {
@@ -207,23 +238,14 @@ export default function Board() {
           {/* ── 달력 ── */}
           <div className="mb-6 rounded-xl border border-[#33333A] bg-[#1E1E24] p-4">
             <div className="flex items-center justify-between mb-3">
-              <button
-                onClick={() => gotoMonth(-1)}
-                className="rounded-md px-3 py-1 text-sm text-gray-300 hover:bg-[#27272A]"
-              >‹</button>
+              <button onClick={() => gotoMonth(-1)} className="rounded-md px-3 py-1 text-sm text-gray-300 hover:bg-[#27272A]">‹</button>
               <div className="text-base font-semibold text-white">{viewYear}년 {viewMonth}월</div>
-              <button
-                onClick={() => gotoMonth(1)}
-                className="rounded-md px-3 py-1 text-sm text-gray-300 hover:bg-[#27272A]"
-              >›</button>
+              <button onClick={() => gotoMonth(1)} className="rounded-md px-3 py-1 text-sm text-gray-300 hover:bg-[#27272A]">›</button>
             </div>
 
             <div className="grid grid-cols-7 gap-1 mb-1">
               {WEEKDAYS.map((w, i) => (
-                <div
-                  key={w}
-                  className={'text-center text-xs py-1 ' + (i === 0 ? 'text-red-400' : 'text-gray-500')}
-                >{w}</div>
+                <div key={w} className={'text-center text-xs py-1 ' + (i === 0 ? 'text-red-400' : 'text-gray-500')}>{w}</div>
               ))}
             </div>
 
@@ -234,23 +256,23 @@ export default function Board() {
                 const count = (byDate[key] || []).length;
                 const isSel = selectedDate === key;
                 const isSun = idx % 7 === 0;
+                const isPast = key < todayStr;
+                const isToday = key === todayStr;
+                let cls = 'relative aspect-square rounded-lg text-sm flex flex-col items-center justify-center transition ';
+                if (isSel) cls += 'bg-[#E67E22] text-white font-bold';
+                else if (count > 0 && isPast) cls += 'bg-gray-500/15 text-gray-400 font-semibold hover:bg-gray-500/25 cursor-pointer';
+                else if (count > 0) cls += 'bg-[#E67E22]/15 text-[#E67E22] font-semibold hover:bg-[#E67E22]/25 cursor-pointer';
+                else cls += (isSun ? 'text-red-400/60 ' : 'text-gray-400 ') + 'cursor-default';
                 return (
                   <button
                     key={idx}
                     onClick={() => setSelectedDate(isSel ? null : (count > 0 ? key : null))}
                     disabled={count === 0}
-                    className={
-                      'relative aspect-square rounded-lg text-sm flex flex-col items-center justify-center transition ' +
-                      (isSel
-                        ? 'bg-[#E67E22] text-white font-bold'
-                        : count > 0
-                          ? 'bg-[#E67E22]/15 text-[#E67E22] font-semibold hover:bg-[#E67E22]/25 cursor-pointer'
-                          : (isSun ? 'text-red-400/60' : 'text-gray-400') + ' cursor-default')
-                    }
+                    className={cls + (isToday && !isSel ? ' ring-1 ring-[#E67E22]/50' : '')}
                   >
                     <span>{day}</span>
                     {count > 0 && (
-                      <span className={'mt-0.5 text-[10px] leading-none ' + (isSel ? 'text-white' : 'text-[#E67E22]')}>
+                      <span className={'mt-0.5 text-[10px] leading-none ' + (isSel ? 'text-white' : isPast ? 'text-gray-400' : 'text-[#E67E22]')}>
                         {count}건
                       </span>
                     )}
@@ -258,23 +280,39 @@ export default function Board() {
                 );
               })}
             </div>
+            <p className="mt-2 text-[11px] text-gray-500">회색 날짜는 이미 지난(완료) 모임입니다.</p>
           </div>
 
-          {/* ── 목록 ── */}
+          {/* ── 탭 + 목록 ── */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-400">
-                {selectedDate
-                  ? `${Number(selectedDate.slice(5, 7))}월 ${Number(selectedDate.slice(8, 10))}일 모임 (${listEntries.length})`
-                  : `전체 (${entries.length})`}
-              </h2>
-              {selectedDate && (
-                <button
-                  onClick={() => setSelectedDate(null)}
-                  className="text-xs text-gray-400 hover:text-white"
-                >전체 보기</button>
-              )}
+            <div className="flex flex-wrap gap-1 mb-3">
+              {TABS.map((t) => {
+                const active = activeTab === t.key && !selectedDate;
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => { setActiveTab(t.key); setSelectedDate(null); }}
+                    className={
+                      'rounded-lg px-3 py-1.5 text-sm font-medium transition border ' +
+                      (active
+                        ? 'bg-[#E67E22] text-white border-[#E67E22]'
+                        : 'bg-[#1E1E24] text-gray-400 border-[#27272A] hover:text-white')
+                    }
+                  >
+                    {t.label} ({counts[t.key]})
+                  </button>
+                );
+              })}
             </div>
+
+            {selectedDate && (
+              <div className="flex items-center justify-between mb-3 rounded-lg bg-[#E67E22]/10 px-3 py-2">
+                <span className="text-sm font-medium text-[#E67E22]">
+                  {Number(selectedDate.slice(5, 7))}월 {Number(selectedDate.slice(8, 10))}일 모임만 보는 중 ({listEntries.length})
+                </span>
+                <button onClick={() => setSelectedDate(null)} className="text-xs text-gray-300 hover:text-white">해제</button>
+              </div>
+            )}
 
             {loading ? (
               <p className="text-sm text-gray-500">불러오는 중…</p>
@@ -284,8 +322,9 @@ export default function Board() {
               <ul className="space-y-2">
                 {listEntries.map((e) => {
                   const info = (e.meeting_info || '').trim();
-                  const isNo = info === '모임X';
-                  const isDone = info === '모임완료';
+                  const s = statusOf(e, todayStr);
+                  const isDone = s === 'done';
+                  const isCancelled = s === 'cancelled';
                   return (
                     <li
                       key={e.group_id}
@@ -298,13 +337,14 @@ export default function Board() {
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-white">{e.author_name}</span>
                           {isDone && (
-                            <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">
-                              완료
-                            </span>
+                            <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">완료</span>
+                          )}
+                          {isCancelled && (
+                            <span className="rounded bg-gray-600/20 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400">모임X</span>
                           )}
                         </div>
-                        <div className={'text-sm ' + (isNo || isDone ? 'text-gray-500' : 'text-gray-300')}>
-                          {info || '—'}
+                        <div className={'text-sm ' + (isDone || isCancelled ? 'text-gray-500' : 'text-gray-300')}>
+                          {info === '모임완료' || info === '모임X' ? (e.meeting_date ? `${Number(e.meeting_date.slice(5,7))}월 ${Number(e.meeting_date.slice(8,10))}일` : '—') : (info || '—')}
                         </div>
                       </div>
                     </li>
@@ -326,9 +366,7 @@ export default function Board() {
                   className="w-full rounded-lg bg-[#18181C] border border-[#33333A] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E67E22]"
                 >
                   <option value="">— 조를 선택하세요 —</option>
-                  {ALL_GROUP_IDS.map((id) => (
-                    <option key={id} value={id}>{id}조</option>
-                  ))}
+                  {ALL_GROUP_IDS.map((id) => (<option key={id} value={id}>{id}조</option>))}
                 </select>
               </div>
 
@@ -343,42 +381,57 @@ export default function Board() {
                 />
               </div>
 
-              <div>
-                <label className="flex items-center gap-2 text-sm text-gray-300 mb-2">
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-300">
                   <input
                     type="checkbox"
                     checked={noMeeting}
-                    onChange={(e) => setNoMeeting(e.target.checked)}
+                    onChange={(e) => { setNoMeeting(e.target.checked); if (e.target.checked) setDone(false); }}
                     className="accent-[#E67E22] h-4 w-4"
                   />
                   모임 없음 (모임X)
                 </label>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={done}
+                    onChange={(e) => { setDone(e.target.checked); if (e.target.checked) setNoMeeting(false); }}
+                    className="accent-emerald-500 h-4 w-4"
+                  />
+                  모임 완료
+                </label>
+              </div>
 
-                {!noMeeting && (
-                  <div className="grid gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">모임 날짜 (달력 표시용)</label>
-                      <input
-                        type="date"
-                        value={meetingDate}
-                        onChange={(e) => setMeetingDate(e.target.value)}
-                        className="w-full rounded-lg bg-[#18181C] border border-[#33333A] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E67E22]"
-                      />
-                      <p className="mt-1 text-[11px] text-gray-500">날짜가 아직 미정이면 비워두세요. (달력엔 안 뜨고 목록에만 표시)</p>
-                    </div>
+              {!noMeeting && (
+                <div className="grid gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">모임 날짜 (달력 표시용)</label>
+                    <input
+                      type="date"
+                      value={meetingDate}
+                      onChange={(e) => setMeetingDate(e.target.value)}
+                      className="w-full rounded-lg bg-[#18181C] border border-[#33333A] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#E67E22]"
+                    />
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      {done
+                        ? '완료된 모임 날짜를 넣으면 달력·완료 목록에 표시됩니다. (미정이면 비워두세요)'
+                        : '날짜가 지나면 자동으로 완료로 분류됩니다. 미정이면 비워두세요.'}
+                    </p>
+                  </div>
+                  {!done && (
                     <div>
                       <label className="block text-xs text-gray-400 mb-1">모임 안내 (시간/장소 등)</label>
                       <input
                         type="text"
                         value={meetingInfo}
                         onChange={(e) => setMeetingInfo(e.target.value)}
-                        placeholder="예) 7월 23일 (목) 밤 9시 30분 줌모임"
+                        placeholder="예) 7월 23일 (목) 밤 9시 30분 줌모임 / 8월 진행 예정"
                         className="w-full rounded-lg bg-[#18181C] border border-[#33333A] px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#E67E22]"
                       />
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs text-gray-400 mb-1">PIN (명단 저장 때 쓰신 비밀번호)</label>
