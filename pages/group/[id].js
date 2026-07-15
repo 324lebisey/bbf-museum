@@ -1,5 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
+
+const headerScrollRef = useRef(null);
+const bodyScrollRef = useRef(null);
+const handleBodyScroll = () => {
+  if (headerScrollRef.current && bodyScrollRef.current) {
+    headerScrollRef.current.scrollLeft = bodyScrollRef.current.scrollLeft;
+  }
+};
+const NAME_COL_WIDTH = 96;
+const DAY_COL_WIDTH = 48;
 
 const TOTAL_DAYS_BY_MONTH = {
   '7월': 27, '8월': 26, '9월': 26, '10월': 27, '11월': 23
@@ -574,64 +584,70 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
               <span>💤</span>
               <span>최근 5일 이상 체크 안 하신 분은 흐리게 표시되고 명단 하단으로 이동해요</span>
             </div>
-            <div className="overflow-x-auto verflow-y-auto max-h-[65vh] rounded-xl border border-[#1F1F23] bg-[#0E0E11]">
-              <table className="w-full text-sm text-center">
-                <thead>
-                  <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-sm font-bold sticky top-0 z-20">
-                    <th className="py-3 px-4 text-left sticky left-0 top-0 bg-[#141416] text-[#A1A1AA] z-30 border-r border-[#1F1F23]">이름</th>
-                    {Array.from({ length: targetDays }).map((_, i) => {
-                      // 주간 구분선: 토요일(한 주의 마지막 통독일) 오른쪽에 얇은 선
-                      const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
-                      // 저장은 여전히 일차(1,2,3…) 기준이지만, 화면엔 실제 날짜 숫자만 표시 (일요일 제외)
-                      const displayDate = readingDates[i] ? readingDates[i].getDate() : i + 1;
-                      // ── 일차별 진도율: 저장 키(일차)로 조회, 미래 일차는 표시 안 함, 100%는 금색 강조 ──
-                      const dayKey = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
-                      const isFutureDay = toGlobalIndex(dayKey) > todayGlobal;
-                      const dayPct = getDayPercent(dayKey);
-                      const isFullDay = !isFutureDay && activeMemberCount > 0 && dayPct === 100;
-                      return (
-                        <th key={i} className={'py-3 px-2 min-w-[48px] font-mono text-[#71717A]' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
-                          <div style={isFullDay ? {
-                            color: '#FFD700',
-                            textShadow: '0 0 6px rgba(255,215,0,0.9), 0 0 14px rgba(255,179,102,0.6), 0 0 24px rgba(255,179,102,0.35)',
-                          } : undefined}>{displayDate}</div>
-                          <div style={{
-                            fontSize: '11px',
-                            marginTop: '2px',
-                            fontWeight: isFullDay ? 700 : 400,
-                            color: isFullDay ? '#FFD700' : '#52525B',
-                          }}>
-                            {isFutureDay ? '\u00A0' : isFullDay ? '100%✓' : dayPct + '%'}
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1F1F23]">
-                  {processedMembers.map((member) => (
-                    <tr key={member.id} className={'hover:bg-[#18181C]/50 transition-all ' + (member.isInactive ? 'opacity-30 bg-black/40' : '')}>
-                      <td className="py-3 px-4 font-bold text-left text-xs text-[#D4D4D8] sticky left-0 bg-[#121215] border-r border-[#1F1F23] z-10"><span className="flex items-center gap-1.5">
-          {member.name}
-          {member.isInactive && <span title="5일 이상 미체크">💤</span>}
-        </span></td>
-                      {Array.from({ length: targetDays }).map((_, i) => {
-                        const dateStr = '2026-' + monthString + '-' + String(i+1).padStart(2, '0');
-                        const isChecked = logs.some(l => l.member_name === member.name && l.check_date === dateStr);
-                        const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
-                        return (
-                          <td key={i} className={'py-3 px-2' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
-                            <input type="checkbox" checked={isChecked} onChange={(e) => handleCheckboxToggle(member.name, dateStr, e.target.checked)} className="accent-[#E67E22] h-4 w-4 rounded border-[#27272A] bg-[#18181C] cursor-pointer" />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+            <div className="rounded-xl border border-[#1F1F23] bg-[#0E0E11] overflow-hidden">
+  {/* 날짜 헤더 — 별도 div, sticky top-0으로 페이지 스크롤 기준 고정 */}
+  <div ref={headerScrollRef} className="overflow-x-hidden sticky top-0 z-20 bg-[#141416]">
+    <table style={{ tableLayout: 'fixed', width: NAME_COL_WIDTH + targetDays * DAY_COL_WIDTH }} className="text-sm text-center">
+      <colgroup>
+        <col style={{ width: NAME_COL_WIDTH }} />
+        {Array.from({ length: targetDays }).map((_, i) => <col key={i} style={{ width: DAY_COL_WIDTH }} />)}
+      </colgroup>
+      <thead>
+        <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-sm font-bold">
+          <th className="py-3 px-4 text-left sticky left-0 bg-[#141416] text-[#A1A1AA] z-30 border-r border-[#1F1F23] whitespace-nowrap">이름</th>
+          {Array.from({ length: targetDays }).map((_, i) => {
+            const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
+            const displayDate = readingDates[i] ? readingDates[i].getDate() : i + 1;
+            const dayKey = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
+            const isFutureDay = toGlobalIndex(dayKey) > todayGlobal;
+            const dayPct = getDayPercent(dayKey);
+            const isFullDay = !isFutureDay && activeMemberCount > 0 && dayPct === 100;
+            return (
+              <th key={i} className={'py-3 px-2 font-mono text-[#71717A]' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
+                <div style={isFullDay ? { color: '#FFD700', textShadow: '0 0 6px rgba(255,215,0,0.9), 0 0 14px rgba(255,179,102,0.6), 0 0 24px rgba(255,179,102,0.35)' } : undefined}>{displayDate}</div>
+                <div style={{ fontSize: '11px', marginTop: '2px', fontWeight: isFullDay ? 700 : 400, color: isFullDay ? '#FFD700' : '#52525B' }}>
+                  {isFutureDay ? '\u00A0' : isFullDay ? '100%✓' : dayPct + '%'}
+                </div>
+              </th>
+            );
+          })}
+        </tr>
+      </thead>
+    </table>
+  </div>
+
+  {/* 표 본문 — 가로 스크롤은 여기서만, 세로는 페이지 스크롤 그대로 */}
+  <div ref={bodyScrollRef} onScroll={handleBodyScroll} className="overflow-x-auto">
+    <table style={{ tableLayout: 'fixed', width: NAME_COL_WIDTH + targetDays * DAY_COL_WIDTH }} className="text-sm text-center">
+      <colgroup>
+        <col style={{ width: NAME_COL_WIDTH }} />
+        {Array.from({ length: targetDays }).map((_, i) => <col key={i} style={{ width: DAY_COL_WIDTH }} />)}
+      </colgroup>
+      <tbody className="divide-y divide-[#1F1F23]">
+        {processedMembers.map((member) => (
+          <tr key={member.id} className={'hover:bg-[#18181C]/50 transition-all ' + (member.isInactive ? 'opacity-30 bg-black/40' : '')}>
+            <td className="py-3 px-4 font-bold text-left text-sm text-[#D4D4D8] sticky left-0 bg-[#121215] border-r border-[#1F1F23] z-10 whitespace-nowrap">
+              <span className="flex items-center gap-1.5">
+                {member.name}
+                {member.isInactive && <span title="5일 이상 미체크">💤</span>}
+              </span>
+            </td>
+            {Array.from({ length: targetDays }).map((_, i) => {
+              const dateStr = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
+              const isChecked = logs.some(l => l.member_name === member.name && l.check_date === dateStr);
+              const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
+              return (
+                <td key={i} className={'py-3 px-2' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
+                  <input type="checkbox" checked={isChecked} onChange={(e) => handleCheckboxToggle(member.name, dateStr, e.target.checked)} className="accent-[#E67E22] h-4 w-4 rounded border-[#27272A] bg-[#18181C] cursor-pointer" />
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
 
       </div>
     </div>
