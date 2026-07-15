@@ -266,6 +266,13 @@ export default function GroupDashboard() {
       // 명단 순서를 고정하고, 상태를 업데이트합니다.
       setMembers([...result.members]); 
       setLogs(result.logs || []);
+      // 우리 조 데이터일 때만, 입력창이 비어 있으면 현재 명단으로 채워줌
+      // → PIN 등록·조원 한 명 추가 등에 전체 재입력이 필요 없어짐.
+      //   (타 조 갤러리 순회 데이터로는 절대 채우지 않음 / 입력 중인 내용은 덮어쓰지 않음)
+      if (String(targetGroupId) === String(groupId)) {
+        const currentNames = result.members.map(m => m.name).join(', ');
+        setMemberInput(prev => (prev.trim() === '' ? currentNames : prev));
+      }
     }
   };
 
@@ -581,7 +588,10 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
                       const isFullDay = !isFutureDay && activeMemberCount > 0 && dayPct === 100;
                       return (
                         <th key={i} className={'py-3 px-2 min-w-[48px] font-mono text-[#71717A]' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
-                          <div>{displayDate}</div>
+                          <div style={isFullDay ? {
+                            color: '#FFD700',
+                            textShadow: '0 0 6px rgba(255,215,0,0.9), 0 0 14px rgba(255,179,102,0.6), 0 0 24px rgba(255,179,102,0.35)',
+                          } : undefined}>{displayDate}</div>
                           <div style={{
                             fontSize: '11px',
                             marginTop: '2px',
