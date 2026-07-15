@@ -570,11 +570,14 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
               <input type="text" value={memberInput} onChange={(e) => setMemberInput(e.target.value)} placeholder="조원 이름을 쉼표로 구분하여 입력 (예: 최경미, 이지민, 홍길동)" className="flex-1 bg-[#18181C] border border-[#27272A] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#E67E22] placeholder:text-[#3F3F46]" />
               <button onClick={handleRegisterMembers} className="bg-[#E67E22] hover:bg-[#D35400] text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-[#E67E22]/10">명단 저장</button>
             </div>
-
+<div className="mb-3 flex items-center gap-1.5 text-xs text-[#71717A]">
+              <span>💤</span>
+              <span>최근 5일 이상 체크 안 하신 분은 흐리게 표시되고 명단 하단으로 이동해요</span>
+            </div>
             <div className="overflow-x-auto rounded-xl border border-[#1F1F23] bg-[#0E0E11]">
               <table className="w-full text-sm text-center">
                 <thead>
-                  <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-s font-bold sticky top-0 z-20">
+                  <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-sm font-bold sticky top-0 z-20">
                     <th className="py-3 px-4 text-left sticky left-0 top-0 bg-[#141416] text-[#A1A1AA] z-30 border-r border-[#1F1F23]">이름</th>
                     {Array.from({ length: targetDays }).map((_, i) => {
                       // 주간 구분선: 토요일(한 주의 마지막 통독일) 오른쪽에 얇은 선
@@ -608,7 +611,10 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
                 <tbody className="divide-y divide-[#1F1F23]">
                   {processedMembers.map((member) => (
                     <tr key={member.id} className={'hover:bg-[#18181C]/50 transition-all ' + (member.isInactive ? 'opacity-30 bg-black/40' : '')}>
-                      <td className="py-3 px-4 font-bold text-left text-sm text-[#D4D4D8] sticky left-0 bg-[#121215] border-r border-[#1F1F23] z-10">{member.name}</td>
+                      <td className="py-3 px-4 font-bold text-left text-sm text-[#D4D4D8] sticky left-0 bg-[#121215] border-r border-[#1F1F23] z-10"><span className="flex items-center gap-1.5">
+          {member.name}
+          {member.isInactive && <span title="5일 이상 미체크">💤</span>}
+        </span></td>
                       {Array.from({ length: targetDays }).map((_, i) => {
                         const dateStr = '2026-' + monthString + '-' + String(i+1).padStart(2, '0');
                         const isChecked = logs.some(l => l.member_name === member.name && l.check_date === dateStr);
