@@ -174,7 +174,20 @@ export default async function handler(req, res) {
 
       // [Action A] 조원 명단 등록/갱신
       if (action === 'register') {
-        const { names } = req.body;
+        const { names, pin } = req.body;
+
+        // ── 조장 PIN 검증: 이 조의 첫 저장이면 등록, 이후엔 일치해야만 저장 진행 ──
+        // (프론트 잠금만으론 API 직접 호출로 우회 가능하므로 반드시 서버에서 검증)
+        const trimmedPin = String(pin || '').trim();
+        if (trimmedPin.length < 4) {
+          return res.status(400).json({ error: 'PIN은 4자리 이상이어야 합니다.' });
+        }
+        const pinRows = await sql`SELECT roster_pin FROM group_settings WHERE group_id = ${groupId}`;
+        if (pinRows.length === 0) {
+          await sql`INSERT INTO group_settings (group_id, roster_pin) VALUES (${groupId}, ${trimmedPin})`;
+        } else if (pinRows[0].roster_pin !== trimmedPin) {
+          return res.status(403).json({ error: 'PIN이 일치하지 않습니다. 명단 변경은 조장에게 문의하세요.' });
+        }
 
         // 기존 데이터와 꼬이지 않도록 해당 조의 기존 명단을 초기화 후 재등록 (트랜잭션 대용)
         await sql`DELETE FROM group_members WHERE group_id = ${groupId}`;
