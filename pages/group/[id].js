@@ -574,7 +574,7 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
               <span>💤</span>
               <span>최근 5일 이상 체크 안 하신 분은 흐리게 표시되고 명단 하단으로 이동해요</span>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-[#1F1F23] bg-[#0E0E11]">
+            <div className="overflow-x-auto verflow-y-auto max-h-[65vh] rounded-xl border border-[#1F1F23] bg-[#0E0E11]">
               <table className="w-full text-sm text-center">
                 <thead>
                   <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-sm font-bold sticky top-0 z-20">
@@ -611,7 +611,7 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
                 <tbody className="divide-y divide-[#1F1F23]">
                   {processedMembers.map((member) => (
                     <tr key={member.id} className={'hover:bg-[#18181C]/50 transition-all ' + (member.isInactive ? 'opacity-30 bg-black/40' : '')}>
-                      <td className="py-3 px-4 font-bold text-left text-sm text-[#D4D4D8] sticky left-0 bg-[#121215] border-r border-[#1F1F23] z-10"><span className="flex items-center gap-1.5">
+                      <td className="py-3 px-4 font-bold text-left text-xs text-[#D4D4D8] sticky left-0 bg-[#121215] border-r border-[#1F1F23] z-10"><span className="flex items-center gap-1.5">
           {member.name}
           {member.isInactive && <span title="5일 이상 미체크">💤</span>}
         </span></td>
