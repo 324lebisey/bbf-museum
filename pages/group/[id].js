@@ -1,16 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 
-const headerScrollRef = useRef(null);
-const bodyScrollRef = useRef(null);
-const handleBodyScroll = () => {
-  if (headerScrollRef.current && bodyScrollRef.current) {
-    headerScrollRef.current.scrollLeft = bodyScrollRef.current.scrollLeft;
-  }
-};
-const NAME_COL_WIDTH = 96;
-const DAY_COL_WIDTH = 48;
-
 const TOTAL_DAYS_BY_MONTH = {
   '7월': 27, '8월': 26, '9월': 26, '10월': 27, '11월': 23
 };
@@ -84,7 +74,6 @@ const ALL_GROUP_IDS = (() => {
   return ids;
 })();
 
-// ── 94개조 모자이크 컴포넌트: 이달의 명화 아래, 조별 진행률을 타일로 표시 ──
 // ── 94개조 모자이크 컴포넌트: 이달의 명화 아래, 조별 진행률을 타일로 표시 ──
 const MOSAIC_ROWS = 7;
 
@@ -219,6 +208,17 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
 export default function GroupDashboard() {
   const router = useRouter();
   const { id: queryId } = router.query;
+
+  // ── 명단표: 헤더/본문 가로 스크롤 동기화용 ref (반드시 컴포넌트 내부에 있어야 Hook 규칙 준수) ──
+  const headerScrollRef = useRef(null);
+  const bodyScrollRef = useRef(null);
+  const handleBodyScroll = () => {
+    if (headerScrollRef.current && bodyScrollRef.current) {
+      headerScrollRef.current.scrollLeft = bodyScrollRef.current.scrollLeft;
+    }
+  };
+  const NAME_COL_WIDTH = 120; // 이름 4글자가 한 줄에 들어가도록 넉넉히
+  const DAY_COL_WIDTH = 48;
 
   const [activeTab, setActiveTab] = useState('우리 조 작품');
   const [currentMonth, setCurrentMonth] = useState('7월');
@@ -384,7 +384,7 @@ export default function GroupDashboard() {
   const targetDays = TOTAL_DAYS_BY_MONTH[currentMonth] || 30;
   const groupTargetGoal = activeMemberCount * targetDays;
   
-const monthString = currentMonth.replace('월', '').padStart(2, '0');
+  const monthString = currentMonth.replace('월', '').padStart(2, '0');
   const activeNames = new Set(processedMembers.filter(m => !m.isInactive).map(m => m.name));
   const groupCurrentChecked = logs.filter(
     l => activeNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
@@ -416,7 +416,7 @@ const monthString = currentMonth.replace('월', '').padStart(2, '0');
     progressPercent = goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
   }
   progressPercent = Math.min(Number(progressPercent), 100).toFixed(1);
-const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) >= 100;
+  const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) >= 100;
   const getMaskStyle = (percent) => {
     if (Number(percent) === 0) return { WebkitMaskImage: 'none', maskImage: 'none', opacity: 0 };
     let maskValue = '';
@@ -429,10 +429,11 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
     } else {
       switch(currentMonth) {
         case '7월': {
-          // 맞닿은 손끝 사이(35% 47%)에서 아주 작게 시작 → 진행률만큼 선형으로 커짐
+          // 맞닿은 손끝 사이(41% 47%)에서 아주 작게 시작 → 진행률만큼 선형으로 커짐
+          // (기존 35% → 41%로 오른쪽 이동: 아담과 하나님 손끝이 만나는 지점으로 정확히 맞춤)
           const jCore = Number(percent);   // 완전 밝은 반경 (진행률 1:1)
           const jEdge = jCore + 5;          // 페이드 폭 (작을수록 시작 원이 더 조여짐)
-          maskValue = 'radial-gradient(circle at 35% 47%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
+          maskValue = 'radial-gradient(circle at 41% 47%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
           break;
         }
         case '8월': {
@@ -580,72 +581,80 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
               <input type="text" value={memberInput} onChange={(e) => setMemberInput(e.target.value)} placeholder="조원 이름을 쉼표로 구분하여 입력 (예: 최경미, 이지민, 홍길동)" className="flex-1 bg-[#18181C] border border-[#27272A] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#E67E22] placeholder:text-[#3F3F46]" />
               <button onClick={handleRegisterMembers} className="bg-[#E67E22] hover:bg-[#D35400] text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-[#E67E22]/10">명단 저장</button>
             </div>
-<div className="mb-3 flex items-center gap-1.5 text-xs text-[#71717A]">
+
+            <div className="rounded-xl border border-[#1F1F23] bg-[#0E0E11] overflow-hidden">
+              {/* 날짜 헤더 — 별도 div, sticky top-0으로 페이지 스크롤 기준 고정 */}
+              <div ref={headerScrollRef} className="overflow-x-hidden sticky top-0 z-20 bg-[#141416]">
+                <table style={{ tableLayout: 'fixed', width: NAME_COL_WIDTH + targetDays * DAY_COL_WIDTH }} className="text-sm text-center">
+                  <colgroup>
+                    <col style={{ width: NAME_COL_WIDTH }} />
+                    {Array.from({ length: targetDays }).map((_, i) => <col key={i} style={{ width: DAY_COL_WIDTH }} />)}
+                  </colgroup>
+                  <thead>
+                    <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-sm font-bold">
+                      <th className="py-3 px-4 text-left sticky left-0 bg-[#141416] text-[#A1A1AA] z-30 border-r border-[#1F1F23] whitespace-nowrap">이름</th>
+                      {Array.from({ length: targetDays }).map((_, i) => {
+                        const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
+                        const displayDate = readingDates[i] ? readingDates[i].getDate() : i + 1;
+                        const dayKey = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
+                        const isFutureDay = toGlobalIndex(dayKey) > todayGlobal;
+                        const dayPct = getDayPercent(dayKey);
+                        const isFullDay = !isFutureDay && activeMemberCount > 0 && dayPct === 100;
+                        return (
+                          <th key={i} className={'py-3 px-2 font-mono text-[#71717A]' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
+                            <div style={isFullDay ? { color: '#FFD700', textShadow: '0 0 6px rgba(255,215,0,0.9), 0 0 14px rgba(255,179,102,0.6), 0 0 24px rgba(255,179,102,0.35)' } : undefined}>{displayDate}</div>
+                            <div style={{ fontSize: '11px', marginTop: '2px', fontWeight: isFullDay ? 700 : 400, color: isFullDay ? '#FFD700' : '#52525B' }}>
+                              {isFutureDay ? '\u00A0' : isFullDay ? '100%✓' : dayPct + '%'}
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+
+              {/* 표 본문 — 가로 스크롤은 여기서만, 세로는 페이지 스크롤 그대로 */}
+              <div ref={bodyScrollRef} onScroll={handleBodyScroll} className="overflow-x-auto">
+                <table style={{ tableLayout: 'fixed', width: NAME_COL_WIDTH + targetDays * DAY_COL_WIDTH }} className="text-sm text-center">
+                  <colgroup>
+                    <col style={{ width: NAME_COL_WIDTH }} />
+                    {Array.from({ length: targetDays }).map((_, i) => <col key={i} style={{ width: DAY_COL_WIDTH }} />)}
+                  </colgroup>
+                  <tbody className="divide-y divide-[#1F1F23]">
+                    {processedMembers.map((member) => (
+                      <tr key={member.id} className={'hover:bg-[#18181C]/50 transition-all ' + (member.isInactive ? 'opacity-30 bg-black/40' : '')}>
+                        <td className="py-3 px-4 font-bold text-left text-sm text-[#D4D4D8] sticky left-0 bg-[#121215] border-r border-[#1F1F23] z-10 whitespace-nowrap">
+                          <span className="flex items-center gap-1.5">
+                            {member.name}
+                            {member.isInactive && <span title="5일 이상 미체크">💤</span>}
+                          </span>
+                        </td>
+                        {Array.from({ length: targetDays }).map((_, i) => {
+                          const dateStr = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
+                          const isChecked = logs.some(l => l.member_name === member.name && l.check_date === dateStr);
+                          const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
+                          return (
+                            <td key={i} className={'py-3 px-2' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
+                              <input type="checkbox" checked={isChecked} onChange={(e) => handleCheckboxToggle(member.name, dateStr, e.target.checked)} className="accent-[#E67E22] h-4 w-4 rounded border-[#27272A] bg-[#18181C] cursor-pointer" />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 표 하단 안내 문구 (흰색) */}
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-white">
               <span>💤</span>
               <span>최근 5일 이상 체크 안 하신 분은 흐리게 표시되고 명단 하단으로 이동해요</span>
             </div>
-            <div className="rounded-xl border border-[#1F1F23] bg-[#0E0E11] overflow-hidden">
-  {/* 날짜 헤더 — 별도 div, sticky top-0으로 페이지 스크롤 기준 고정 */}
-  <div ref={headerScrollRef} className="overflow-x-hidden sticky top-0 z-20 bg-[#141416]">
-    <table style={{ tableLayout: 'fixed', width: NAME_COL_WIDTH + targetDays * DAY_COL_WIDTH }} className="text-sm text-center">
-      <colgroup>
-        <col style={{ width: NAME_COL_WIDTH }} />
-        {Array.from({ length: targetDays }).map((_, i) => <col key={i} style={{ width: DAY_COL_WIDTH }} />)}
-      </colgroup>
-      <thead>
-        <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-sm font-bold">
-          <th className="py-3 px-4 text-left sticky left-0 bg-[#141416] text-[#A1A1AA] z-30 border-r border-[#1F1F23] whitespace-nowrap">이름</th>
-          {Array.from({ length: targetDays }).map((_, i) => {
-            const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
-            const displayDate = readingDates[i] ? readingDates[i].getDate() : i + 1;
-            const dayKey = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
-            const isFutureDay = toGlobalIndex(dayKey) > todayGlobal;
-            const dayPct = getDayPercent(dayKey);
-            const isFullDay = !isFutureDay && activeMemberCount > 0 && dayPct === 100;
-            return (
-              <th key={i} className={'py-3 px-2 font-mono text-[#71717A]' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
-                <div style={isFullDay ? { color: '#FFD700', textShadow: '0 0 6px rgba(255,215,0,0.9), 0 0 14px rgba(255,179,102,0.6), 0 0 24px rgba(255,179,102,0.35)' } : undefined}>{displayDate}</div>
-                <div style={{ fontSize: '11px', marginTop: '2px', fontWeight: isFullDay ? 700 : 400, color: isFullDay ? '#FFD700' : '#52525B' }}>
-                  {isFutureDay ? '\u00A0' : isFullDay ? '100%✓' : dayPct + '%'}
-                </div>
-              </th>
-            );
-          })}
-        </tr>
-      </thead>
-    </table>
-  </div>
-
-  {/* 표 본문 — 가로 스크롤은 여기서만, 세로는 페이지 스크롤 그대로 */}
-  <div ref={bodyScrollRef} onScroll={handleBodyScroll} className="overflow-x-auto">
-    <table style={{ tableLayout: 'fixed', width: NAME_COL_WIDTH + targetDays * DAY_COL_WIDTH }} className="text-sm text-center">
-      <colgroup>
-        <col style={{ width: NAME_COL_WIDTH }} />
-        {Array.from({ length: targetDays }).map((_, i) => <col key={i} style={{ width: DAY_COL_WIDTH }} />)}
-      </colgroup>
-      <tbody className="divide-y divide-[#1F1F23]">
-        {processedMembers.map((member) => (
-          <tr key={member.id} className={'hover:bg-[#18181C]/50 transition-all ' + (member.isInactive ? 'opacity-30 bg-black/40' : '')}>
-            <td className="py-3 px-4 font-bold text-left text-sm text-[#D4D4D8] sticky left-0 bg-[#121215] border-r border-[#1F1F23] z-10 whitespace-nowrap">
-              <span className="flex items-center gap-1.5">
-                {member.name}
-                {member.isInactive && <span title="5일 이상 미체크">💤</span>}
-              </span>
-            </td>
-            {Array.from({ length: targetDays }).map((_, i) => {
-              const dateStr = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
-              const isChecked = logs.some(l => l.member_name === member.name && l.check_date === dateStr);
-              const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
-              return (
-                <td key={i} className={'py-3 px-2' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
-                  <input type="checkbox" checked={isChecked} onChange={(e) => handleCheckboxToggle(member.name, dateStr, e.target.checked)} className="accent-[#E67E22] h-4 w-4 rounded border-[#27272A] bg-[#18181C] cursor-pointer" />
-                </td>
-              );
-            })}
-          </tr>
-        ))}
-</tbody>
-                </table>
-              </div>
-            </div> </div> )} </div> </div> );
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
