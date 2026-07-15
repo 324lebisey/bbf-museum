@@ -159,7 +159,7 @@ export default function Board() {
 
           <header className="mb-6 text-center">
             <h1 className="text-2xl font-bold text-[#E67E22]">모임 현황판</h1>
-            <p className="mt-1 text-sm text-gray-400">BBF 3기 2파트 · 줌/오프라인 모임 일시 공유</p>
+            <p className="mt-1 text-sm text-gray-400">BBF 3기 · 줌/오프라인 모임 일시 공유</p>
           </header>
 
           {/* 안내 */}
