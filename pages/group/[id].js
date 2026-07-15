@@ -287,13 +287,21 @@ export default function GroupDashboard() {
     
     if (!memberInput.trim()) return;
     if (!confirm(`${groupId}조 명단을 변경하시겠습니까? 기존 기록은 이름이 일치하면 유지됩니다.`)) return;
+
+    // ── 조장 PIN: 이 조의 첫 저장이면 지금 입력한 PIN이 등록되고, 이후엔 일치해야만 저장됨 ──
+    const pin = window.prompt('조장 PIN을 입력하세요 (4자리 이상).\n※ 이 조의 첫 저장이라면 지금 입력한 PIN이 조장 PIN으로 등록됩니다. 조장님만 알고 계세요!');
+    if (pin === null) return; // 취소
+    if (pin.trim().length < 4) {
+      alert('PIN은 4자리 이상이어야 합니다.');
+      return;
+    }
     
     const nameList = memberInput.split(',').map(n => n.trim()).filter(n => n !== '');
     
     const response = await fetch(`/api/tongdok?groupId=${groupId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'register', names: nameList })
+      body: JSON.stringify({ action: 'register', names: nameList, pin: pin.trim() })
     });
 
     if (response.ok) {
@@ -364,6 +372,17 @@ const monthString = currentMonth.replace('월', '').padStart(2, '0');
   const groupCurrentChecked = logs.filter(
     l => activeNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
   ).length;
+
+  // ── 일차별 진도율: 각 일차를 활성 조원 몇 %가 체크했는지 (분자·분모 모두 활성 기준 = 동일 모집단) ──
+  const dailyCounts = {};
+  logs.forEach(l => {
+    if (!activeNames.has(l.member_name)) return;
+    if (!l.check_date.includes('-' + monthString + '-')) return;
+    dailyCounts[l.check_date] = (dailyCounts[l.check_date] || 0) + 1;
+  });
+  const getDayPercent = (dateStr) =>
+    activeMemberCount > 0 ? Math.round(((dailyCounts[dateStr] || 0) / activeMemberCount) * 100) : 0;
+
   // 주간 구분선용: [i] = (i+1)일차의 실제 달력 날짜
   const readingDates = getReadingDates(currentMonth);
 
@@ -555,9 +574,22 @@ const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) 
                       const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
                       // 저장은 여전히 일차(1,2,3…) 기준이지만, 화면엔 실제 날짜 숫자만 표시 (일요일 제외)
                       const displayDate = readingDates[i] ? readingDates[i].getDate() : i + 1;
+                      // ── 일차별 진도율: 저장 키(일차)로 조회, 미래 일차는 표시 안 함, 100%는 금색 강조 ──
+                      const dayKey = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
+                      const isFutureDay = toGlobalIndex(dayKey) > todayGlobal;
+                      const dayPct = getDayPercent(dayKey);
+                      const isFullDay = !isFutureDay && activeMemberCount > 0 && dayPct === 100;
                       return (
                         <th key={i} className={'py-3 px-2 min-w-[48px] font-mono text-[#71717A]' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
-                          {displayDate}
+                          <div>{displayDate}</div>
+                          <div style={{
+                            fontSize: '11px',
+                            marginTop: '2px',
+                            fontWeight: isFullDay ? 700 : 400,
+                            color: isFullDay ? '#FFD700' : '#52525B',
+                          }}>
+                            {isFutureDay ? '\u00A0' : isFullDay ? '100%✓' : dayPct + '%'}
+                          </div>
                         </th>
                       );
                     })}
