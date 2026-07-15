@@ -481,6 +481,35 @@ export default function GroupDashboard() {
   const isLargeMonth = activeTab !== '150일 대장정' && ['7월', '8월', '9월', '11월'].includes(currentMonth);
   const isOctober = activeTab !== '150일 대장정' && currentMonth === '10월';
 
+  // ── A/B 분리조 진입 차단 ──────────────────────────────
+  // 17·22·26조는 A/B로만 운영되므로, 접미사 없는 맨숫자(?id=17 등)로 들어오면 진입을 막고
+  // A/B 중 하나를 고르도록 안내한다. (문자열 그대로 비교 — Number() 강제변환 금지)
+  const isBlockedSplitGroup = groupId != null && SPLIT_GROUPS.has(Number(groupId)) && /^\d+$/.test(String(groupId));
+
+  if (isBlockedSplitGroup) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0C] text-[#E4E4E7] p-4 md:p-8 font-sans antialiased flex items-center justify-center">
+        <div className="max-w-md w-full bg-[#121215] rounded-2xl border border-[#1F1F23] shadow-2xl p-8 text-center">
+          <div className="text-4xl mb-4">🚧</div>
+          <h1 className="text-xl font-black text-[#F3F4F6] mb-3">{groupId}조는 A / B로 나뉘어 있어요</h1>
+          <p className="text-sm text-[#A1A1AA] leading-relaxed mb-6">
+            인원이 많아 <span className="text-[#E67E22] font-bold">{groupId}A조</span>와 <span className="text-[#E67E22] font-bold">{groupId}B조</span>로 운영됩니다.<br />
+            아래에서 본인의 방을 선택해 주세요.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <a href={`/group/${groupId}A`} className="flex-1 bg-[#E67E22] hover:bg-[#D35400] text-white px-5 py-3 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-[#E67E22]/10">
+              {groupId}A조로 입장
+            </a>
+            <a href={`/group/${groupId}B`} className="flex-1 bg-[#E67E22] hover:bg-[#D35400] text-white px-5 py-3 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-[#E67E22]/10">
+              {groupId}B조로 입장
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // ─────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-[#0A0A0C] text-[#E4E4E7] p-4 md:p-8 font-sans antialiased selection:bg-[#E67E22]/30">
       <div className="max-w-5xl mx-auto">
