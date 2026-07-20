@@ -702,6 +702,12 @@ export default function GroupDashboard() {
               <button onClick={handleRegisterMembers} className="bg-[#E67E22] hover:bg-[#D35400] text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-[#E67E22]/10">명단 저장</button>
             </div>
 
+            {/* 통독 범위 툴팁 사용 안내 — 글자 크기: text-xs(12px)에서 20% 키운 14.4px */}
+            <div className="mb-3 flex items-center gap-1.5 text-[#71717A]" style={{ fontSize: '14.4px' }}>
+              <span>📖</span>
+              <span>날짜를 탭하면 그날의 통독 범위를 확인할 수 있어요. 한번 더 탭하면 닫혀요. (PC에서는 마우스를 올리면 보여요.)</span>
+            </div>
+
             <div className="rounded-xl border border-[#1F1F23] bg-[#0E0E11]">
               {/* 날짜 헤더 — 별도 div, sticky top-0으로 페이지(뷰포트) 스크롤 기준 고정.
                   ※ 부모에 overflow-hidden/auto가 있으면 sticky가 그 박스에 갇혀 무효화되므로 절대 넣지 말 것. */}
@@ -785,12 +791,6 @@ export default function GroupDashboard() {
               <span>최근 5일 이상 체크 안 하신 분은 흐리게 표시되고 명단 하단으로 이동해요</span>
             </div>
             */}
-
-            {/* 통독 범위 툴팁 사용 안내 */}
-            <div className="mt-3 flex items-center gap-1.5 text-xs text-[#71717A]">
-              <span>📖</span>
-              <span>날짜에 마우스를 올리거나(모바일: 탭) 그날의 통독 범위를 확인할 수 있어요</span>
-            </div>
           </div>
         )}
 
