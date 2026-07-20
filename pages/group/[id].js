@@ -15,6 +15,53 @@ const ARTWORKS = {
   '11월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg/3840px-The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg'
 };
 
+// ── 일일 통독 범위표 (키: '월-일' 실제 달력 날짜, 주일 제외) ──────────
+// 날짜 헤더 호버(PC)/탭(모바일) 시 툴팁으로 표시. 정적 상수라 DB·API 불필요.
+const READING_PLAN = {
+  // 7월
+  '7-1': '창 1-11', '7-2': '창 12-21', '7-3': '창 22-28', '7-4': '창 29-35',
+  '7-6': '창 36-42', '7-7': '창 43-50', '7-8': '출 1-7', '7-9': '출 8-15',
+  '7-10': '출 16-23', '7-11': '출 24-31', '7-13': '출 32-40', '7-14': '레 1-8',
+  '7-15': '레 9-15', '7-16': '레 16-23', '7-17': '레 24-27, 민 1-3', '7-18': '민 4-10',
+  '7-20': '민 11-18', '7-21': '민 19-26', '7-22': '민 27-34', '7-23': '민 35-36, 신 1-5',
+  '7-24': '신 6-14', '7-25': '신 15-24', '7-27': '신 25-32', '7-28': '신 33-34, 수 1-6',
+  '7-29': '수 7-15', '7-30': '수 16-24', '7-31': '삿 1-6',
+  // 8월
+  '8-1': '삿 7-13', '8-3': '삿 14-21', '8-4': '룻, 삼상 1-4', '8-5': '삼상 5-12',
+  '8-6': '삼상 13-19', '8-7': '삼상 20-27', '8-8': '삼상 28-31, 삼하 1-5', '8-10': '삼하 6-13',
+  '8-11': '삼하 14-19', '8-12': '삼하 20-24, 왕상 1-2', '8-13': '왕상 3-8', '8-14': '왕상 9-13',
+  '8-15': '왕상 14-19', '8-17': '왕상 20-22, 왕하 1-3', '8-18': '왕하 4-10', '8-19': '왕하 11-17',
+  '8-20': '왕하 18-25', '8-21': '대상 1-6', '8-22': '대상 7-13', '8-24': '대상 14-23',
+  '8-25': '대상 24-29, 대하 1-2', '8-26': '대하 3-11', '8-27': '대하 12-21', '8-28': '대하 22-30',
+  '8-29': '대하 31-36', '8-31': '스 1-10',
+  // 9월
+  '9-1': '느 1-8', '9-2': '느 9-13', '9-3': '에 1-10, 욥 1-3', '9-4': '욥 4-16',
+  '9-5': '욥 17-30', '9-7': '욥 31-42', '9-8': '시 1편-24편', '9-9': '시 25편-41편',
+  '9-10': '시 42편-60편', '9-11': '시 61편-78편', '9-12': '시 79편-94편', '9-14': '시 95편-110편',
+  '9-15': '시 111편-129편', '9-16': '시 130편-150편, 잠 1-3', '9-17': '잠 4-15', '9-18': '잠 16-26',
+  '9-19': '잠 27-31, 전 1-7', '9-21': '전 8-12, 아가서', '9-22': '사 1-12', '9-23': '사 13-24',
+  '9-24': '사 25-34', '9-25': '사 35-43', '9-26': '사 44-54', '9-28': '사 55-66',
+  '9-29': '렘 1-7', '9-30': '렘 8-15',
+  // 10월
+  '10-1': '렘 16-23', '10-2': '렘 24-31', '10-3': '렘 32-39', '10-5': '렘 40-46',
+  '10-6': '렘 47-52', '10-7': '애가, 겔 1-5', '10-8': '겔 6-14', '10-9': '겔 15-21',
+  '10-10': '겔 22-29', '10-12': '겔 30-36', '10-13': '겔 37-43', '10-14': '겔 44-48, 단 1-2',
+  '10-15': '단 3-9', '10-16': '단 10-12, 호 1-9', '10-17': '호 10-14, 요엘, 암 1-5',
+  '10-19': '암 6-9, 오바댜, 요나', '10-20': '미가, 나훔, 하박국, 스바냐', '10-21': '학개, 스가랴 1-12',
+  '10-22': '스가랴 13-14, 말라기, 마 1-5', '10-23': '마 6-12', '10-24': '마 13-19',
+  '10-26': '마 20-26', '10-27': '마 27-28, 막 1-4', '10-28': '막 5-11', '10-29': '막 12-16',
+  '10-30': '눅 1-6', '10-31': '눅 7-11',
+  // 11월
+  '11-2': '눅 12-17', '11-3': '눅 18-23', '11-4': '눅 24, 요 1-5', '11-5': '요 6-10',
+  '11-6': '요 11-16', '11-7': '요 17-21, 행 1-2', '11-9': '행 3-9', '11-10': '행 10-15',
+  '11-11': '행 16-22', '11-12': '행 23-28', '11-13': '롬 1-11', '11-14': '롬 12-16, 고전 1-4',
+  '11-16': '고전 5-14', '11-17': '고전 15-16, 고후 1-8', '11-18': '고후 9-13, 갈라디아서',
+  '11-19': '에베소서, 빌립보서', '11-20': '골로새서, 살전, 살후', '11-21': '딤전, 딤후, 디도서, 빌레몬서',
+  '11-23': '히 1-7', '11-24': '히 8-13, 야고보서, 벧전', '11-25': '벧후, 요123, 유다서',
+  '11-26': '계 1-12', '11-27': '계 13-22',
+};
+// ─────────────────────────────────────────────────────
+
 // ── 일차(주일 제외) 유틸 ──────────────────────────────
 const MONTH_ORDER = ['7월', '8월', '9월', '10월', '11월'];
 
@@ -216,6 +263,7 @@ export default function GroupDashboard() {
     if (headerScrollRef.current && bodyScrollRef.current) {
       headerScrollRef.current.scrollLeft = bodyScrollRef.current.scrollLeft;
     }
+    setReadingTip(null); // 가로 스크롤 시 툴팁 위치가 어긋나므로 닫음
   };
   const NAME_COL_WIDTH = 88; // 한글 4글자 + 좌우 패딩에 딱 맞는 폭
   const DAY_COL_WIDTH = 48;
@@ -229,6 +277,10 @@ export default function GroupDashboard() {
   const [logs, setLogs] = useState([]);
   const [allGroupsLogsCount, setAllGroupsLogsCount] = useState(0);
   const [totalPeople, setTotalPeople] = useState(0); // 현재 등록 인원(분모). 이탈하면 자동으로 줄어듦
+
+  // ── 통독 범위 툴팁: { i, x, y, text, pinned } ──
+  // PC: 호버로 표시/이탈로 숨김. 모바일: 탭하면 고정(pinned), 같은 날짜 다시 탭하면 닫힘.
+  const [readingTip, setReadingTip] = useState(null);
 
   const groupId = queryId; 
 
@@ -248,6 +300,11 @@ export default function GroupDashboard() {
   useEffect(() => {
     if (groupId) fetchGlobalProgress(currentMonthParam());
   }, [groupId, activeTab, currentMonth]);
+
+  // 월·탭이 바뀌면 열려있던 통독 범위 툴팁을 닫음 (날짜가 달라져 내용이 어긋나므로)
+  useEffect(() => {
+    setReadingTip(null);
+  }, [currentMonth, activeTab]);
 
   // 창으로 돌아올 때(그새 다른 조가 체크했을 수 있으니) 최신화
   useEffect(() => {
@@ -363,6 +420,8 @@ export default function GroupDashboard() {
   };
 
   // ── 비활성 판정: 달력 날짜가 아니라 '일차(주일 제외)' 기준 ──
+  // ※ 화면상 흐림/하단 정렬은 껐지만, isInactive 계산 자체는 진도율(분자·분모 동일 모집단)에
+  //    계속 쓰이므로 절대 제거하지 말 것.
   const todayGlobal = getTodayGlobalIndex();               // 예: 7/7(화) → 6일차
   const isTodayReadingDay = new Date().getDay() !== 0;     // 주일이면 오늘은 셀 날이 아님
 
@@ -378,7 +437,9 @@ export default function GroupDashboard() {
       isInactive = true;
     }
     return { ...m, isInactive };
-  }).sort((a, b) => a.isInactive - b.isInactive);
+  });
+  // [비활성 하단 정렬 — 임시 비활성화. 되살리려면 위 `});`를 지우고 아래 주석을 해제]
+  // }).sort((a, b) => a.isInactive - b.isInactive);
 
   const activeMemberCount = processedMembers.filter(m => !m.isInactive).length;
   const targetDays = TOTAL_DAYS_BY_MONTH[currentMonth] || 30;
@@ -402,6 +463,36 @@ export default function GroupDashboard() {
 
   // 주간 구분선용: [i] = (i+1)일차의 실제 달력 날짜
   const readingDates = getReadingDates(currentMonth);
+
+  // ── 통독 범위 툴팁 핸들러 ──────────────────────────────
+  // 위치는 position:fixed 기준(뷰포트 좌표)이라 sticky 헤더의 overflow 클리핑에 안 잘림.
+  const buildReadingTip = (e, i) => {
+    const d = readingDates[i];
+    if (!d) return null;
+    const passage = READING_PLAN[(d.getMonth() + 1) + '-' + d.getDate()];
+    if (!passage) return null;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const half = 110; // 툴팁 절반 폭 추정치 — 화면 가장자리 밖으로 안 나가게 클램프
+    const x = Math.min(Math.max(rect.left + rect.width / 2, half), window.innerWidth - half);
+    return { i, x, y: rect.bottom, text: (d.getMonth() + 1) + '/' + d.getDate() + ' · ' + passage };
+  };
+  const handleTipEnter = (e, i) => {
+    const tip = buildReadingTip(e, i);
+    if (tip) setReadingTip({ ...tip, pinned: false });
+  };
+  const handleTipLeave = () => {
+    setReadingTip(prev => (prev && prev.pinned ? prev : null));
+  };
+  // 모바일: 첫 탭 = mouseenter+click이 같이 발생 → click이 pinned로 승격(계속 표시).
+  //         같은 날짜 두 번째 탭 = click만 발생 → pinned 상태면 닫음.
+  const handleTipClick = (e, i) => {
+    const tip = buildReadingTip(e, i);
+    setReadingTip(prev => {
+      if (prev && prev.i === i && prev.pinned) return null;
+      return tip ? { ...tip, pinned: true } : null;
+    });
+  };
+  // ─────────────────────────────────────────────────────
 
   let progressPercent = 0;
   if (activeTab === '우리 조 작품') {
@@ -631,7 +722,13 @@ export default function GroupDashboard() {
                         const dayPct = getDayPercent(dayKey);
                         const isFullDay = !isFutureDay && activeMemberCount > 0 && dayPct === 100;
                         return (
-                          <th key={i} className={'py-3 px-2 font-mono text-[#71717A]' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
+                          <th
+                            key={i}
+                            onMouseEnter={(e) => handleTipEnter(e, i)}
+                            onMouseLeave={handleTipLeave}
+                            onClick={(e) => handleTipClick(e, i)}
+                            className={'py-3 px-2 font-mono text-[#71717A] cursor-pointer select-none' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}
+                          >
                             <div style={isFullDay ? { color: '#FFD700', textShadow: '0 0 6px rgba(255,215,0,0.9), 0 0 14px rgba(255,179,102,0.6), 0 0 24px rgba(255,179,102,0.35)' } : undefined}>{displayDate}</div>
                             <div style={{ fontSize: '11px', marginTop: '2px', fontWeight: isFullDay ? 700 : 400, color: isFullDay ? '#FFD700' : '#52525B' }}>
                               {isFutureDay ? '\u00A0' : isFullDay ? '100%✓' : dayPct + '%'}
@@ -653,11 +750,16 @@ export default function GroupDashboard() {
                   </colgroup>
                   <tbody className="divide-y divide-[#1F1F23]">
                     {processedMembers.map((member) => (
-                      <tr key={member.id} className={'hover:bg-[#18181C]/50 transition-all ' + (member.isInactive ? 'opacity-30 bg-black/40' : '')}>
+                      /* [비활성 흐림 처리 — 임시 비활성화]
+                         되살리려면 아래 tr의 className을 다음으로 교체:
+                         className={'hover:bg-[#18181C]/50 transition-all ' + (member.isInactive ? 'opacity-30 bg-black/40' : '')} */
+                      <tr key={member.id} className="hover:bg-[#18181C]/50 transition-all">
                         <td className="py-3 px-4 font-bold text-left text-sm text-[#D4D4D8] sticky left-0 bg-[#121215] border-r border-[#1F1F23] z-10 whitespace-nowrap">
                           <span className="flex items-center gap-1.5">
                             {member.name}
+                            {/* [비활성 💤 아이콘 — 임시 비활성화. 되살리려면 주석 해제]
                             {member.isInactive && <span title="5일 이상 미체크">💤</span>}
+                            */}
                           </span>
                         </td>
                         {Array.from({ length: targetDays }).map((_, i) => {
@@ -677,11 +779,28 @@ export default function GroupDashboard() {
               </div>
             </div>
 
-            {/* 표 하단 안내 문구 (흰색) */}
+            {/* [비활성 안내 문구 — 임시 비활성화. 되살리려면 주석 해제]
             <div className="mt-3 flex items-center gap-1.5 text-xs text-white">
               <span>💤</span>
               <span>최근 5일 이상 체크 안 하신 분은 흐리게 표시되고 명단 하단으로 이동해요</span>
             </div>
+            */}
+
+            {/* 통독 범위 툴팁 사용 안내 */}
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-[#71717A]">
+              <span>📖</span>
+              <span>날짜에 마우스를 올리거나(모바일: 탭) 그날의 통독 범위를 확인할 수 있어요</span>
+            </div>
+          </div>
+        )}
+
+        {/* 통독 범위 툴팁 — position:fixed(뷰포트 기준)라 sticky 헤더의 overflow에 안 잘림 */}
+        {readingTip && (
+          <div
+            style={{ position: 'fixed', left: readingTip.x, top: readingTip.y + 6, transform: 'translateX(-50%)', zIndex: 60 }}
+            className="bg-[#1F1F23] border border-[#E67E22]/50 text-[#F3F4F6] text-[13px] font-bold px-3 py-2 rounded-lg shadow-2xl whitespace-nowrap pointer-events-none"
+          >
+            <span className="text-[#E67E22]">📖</span> {readingTip.text}
           </div>
         )}
       </div>
