@@ -522,7 +522,7 @@ export default function GroupDashboard() {
         case '7월': {
           // 맞닿은 손끝 사이(38% 47%)에서 아주 작게 시작 → 진행률만큼 선형으로 커짐
           // (아담 손=35%, 하나님 손=41% 사이 정중앙 38%: 두 손끝이 맞닿는 지점)
-          const jCore = Number(percent);   // 완전 밝은 반경 (진행률 1:1)
+          const jCore = Math.pow(Number(percent) / 100, 1.4) * 100;
           const jEdge = jCore + 5;          // 페이드 폭 (작을수록 시작 원이 더 조여짐)
           maskValue = 'radial-gradient(circle at 38% 47%, rgba(0,0,0,1) ' + jCore + '%, rgba(0,0,0,0) ' + jEdge + '%)';
           break;
