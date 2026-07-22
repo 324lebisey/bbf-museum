@@ -419,22 +419,27 @@ export default function GroupDashboard() {
     fetchData(target);
   };
 
-  // ── 비활성 판정: 달력 날짜가 아니라 '일차(주일 제외)' 기준 ──
-  // ※ 화면상 흐림/하단 정렬은 껐지만, isInactive 계산 자체는 진도율(분자·분모 동일 모집단)에
-  //    계속 쓰이므로 절대 제거하지 말 것.
-  const todayGlobal = getTodayGlobalIndex();               // 예: 7/7(화) → 6일차
-  const isTodayReadingDay = new Date().getDay() !== 0;     // 주일이면 오늘은 셀 날이 아님
+  // ── 비활성 판정: '오늘 날짜'가 아니라 '조가 실제 도달한 지점(중앙값)' 기준 ──
+  const todayGlobal = getTodayGlobalIndex(); // 헤더의 '미래 날짜' 판정용(달력 기준)
+  // ※ 다 같이 늦은 조는 아무도 이탈 처리되지 않고(→ 진도율 0% 붕괴 방지),
+  //   일부만 뒤처지면 그 사람만 분모에서 빠져 남은 인원이 100% 달성 가능.
+  //   중앙값이라 빠른 1~2명 때문에 나머지가 통째로 이탈 처리되는 일도 없음.
+  //   isInactive 계산 자체는 진도율(§4.4 동일 모집단)·모자이크에 계속 쓰이므로 제거 금지.
+  const _latestByMember = members.map(m => {
+    const ml = logs.filter(l => l.member_name === m.name);
+    return ml.length > 0 ? Math.max(...ml.map(l => toGlobalIndex(l.check_date))) : 0;
+  });
+  const _read = _latestByMember.filter(g => g > 0).sort((a, b) => a - b);
+  const groupFrontier = _read.length ? _read[Math.floor((_read.length - 1) / 2)] : 0; // 조 중앙 도달 일차
 
-  const processedMembers = members.map(m => {
-    const memberLogs = logs.filter(l => l.member_name === m.name);
+  const processedMembers = members.map((m, i) => {
+    const latestGlobal = _latestByMember[i];
     let isInactive = false;
-    if (memberLogs.length > 0) {
-      const latestGlobal = Math.max(...memberLogs.map(l => toGlobalIndex(l.check_date)));
-      // 안 읽은 일차 = 마지막 체크 다음 일차 ~ (오늘이 통독일이면 어제 일차까지)
-      const missed = Math.max(todayGlobal - latestGlobal - (isTodayReadingDay ? 1 : 0), 0);
+    if (latestGlobal > 0) {
+      const missed = Math.max(groupFrontier - latestGlobal, 0); // 조 중앙값 대비 뒤처진 일차 수
       if (missed >= 5) isInactive = true;
     } else {
-      isInactive = true;
+      isInactive = true; // 로그가 아예 없으면 비활성
     }
     return { ...m, isInactive };
   });
@@ -451,15 +456,35 @@ export default function GroupDashboard() {
     l => activeNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
   ).length;
 
-  // ── 일차별 진도율: 각 일차를 활성 조원 몇 %가 체크했는지 (분자·분모 모두 활성 기준 = 동일 모집단) ──
+  // ── 일차별 헤더 %: 그날을 '그 일차까지 도달한 조원' 중 몇 %가 체크했는지 ──
+  // ※ 분모 = "그 일차 이상까지 읽은 현재 조원 수"(프론티어 기준).
+  //   - 전원 읽은 날 → 100% (요구사항 1)
+  //   - 뒤처진 사람은 아직 도달 못 한 날의 분모에서 자동 제외 → 그 사람 때문에
+  //     이미 다 채운 과거 날의 100%가 깎이지 않음 (요구사항 2)
+  //   - 조 전체가 밀려도 과거 날은 100%, 아직 아무도 도달 못 한 날만 0%
+  //   (누적 진도율 §4.4는 별개 — activeNames 기준 그대로 유지)
+  const rosterNames = new Set(members.map(m => m.name)); // 유령 로그 배제(현재 명단만)
+  // 각 조원의 '최종 도달 일차'(global index). 로그 없으면 0.
+  const memberFrontier = {};
+  logs.forEach(l => {
+    if (!rosterNames.has(l.member_name)) return;
+    const g = toGlobalIndex(l.check_date);
+    if (!(l.member_name in memberFrontier) || g > memberFrontier[l.member_name]) {
+      memberFrontier[l.member_name] = g;
+    }
+  });
+  const frontierValues = Object.values(memberFrontier);
   const dailyCounts = {};
   logs.forEach(l => {
-    if (!activeNames.has(l.member_name)) return;
+    if (!rosterNames.has(l.member_name)) return;
     if (!l.check_date.includes('-' + monthString + '-')) return;
     dailyCounts[l.check_date] = (dailyCounts[l.check_date] || 0) + 1;
   });
-  const getDayPercent = (dateStr) =>
-    activeMemberCount > 0 ? Math.round(((dailyCounts[dateStr] || 0) / activeMemberCount) * 100) : 0;
+  const getDayPercent = (dateStr) => {
+    const dayG = toGlobalIndex(dateStr);
+    const reached = frontierValues.filter(g => g >= dayG).length; // 그 일차 이상 도달한 인원
+    return reached > 0 ? Math.round(((dailyCounts[dateStr] || 0) / reached) * 100) : 0;
+  };
 
   // 주간 구분선용: [i] = (i+1)일차의 실제 달력 날짜
   const readingDates = getReadingDates(currentMonth);
@@ -726,7 +751,7 @@ export default function GroupDashboard() {
                         const dayKey = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
                         const isFutureDay = toGlobalIndex(dayKey) > todayGlobal;
                         const dayPct = getDayPercent(dayKey);
-                        const isFullDay = !isFutureDay && activeMemberCount > 0 && dayPct === 100;
+                        const isFullDay = !isFutureDay && dayPct === 100;
                         return (
                           <th
                             key={i}
