@@ -457,34 +457,26 @@ export default function GroupDashboard() {
     l => activeNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
   ).length;
 
-  // ── 일차별 헤더 %: 그날을 '그 일차까지 도달한 조원' 중 몇 %가 체크했는지 ──
-  // ※ 분모 = "그 일차 이상까지 읽은 현재 조원 수"(프론티어 기준).
-  //   - 전원 읽은 날 → 100% (요구사항 1)
-  //   - 뒤처진 사람은 아직 도달 못 한 날의 분모에서 자동 제외 → 그 사람 때문에
-  //     이미 다 채운 과거 날의 100%가 깎이지 않음 (요구사항 2)
-  //   - 조 전체가 밀려도 과거 날은 100%, 아직 아무도 도달 못 한 날만 0%
-  //   (누적 진도율 §4.4는 별개 — activeNames 기준 그대로 유지)
+  // ── 일차별 헤더 %: 그날을 '현재 명단 전체' 중 몇 %가 체크했는지 ──
+  // ※ 분모 = 현재 명단 전체(rosterCount). 화면에 보이는 체크 수와 % 숫자가 정확히 일치한다.
+  //   - 전원 체크 → 100%✓ (full=true, '완전체')
+  //   - 한두 명 빠져도 90% 이상이면 점등(LIT_THRESHOLD) → 뒤처진 인원이 축하를 막지 않음
+  //   - 반올림이 100으로 튀어 '가짜 100%'가 되는 것 방지: 진짜 전원(full)일 때만 100 표기
+  //   (누적 진도율 §4.4·모자이크는 별개 — activeNames/중앙값 기준 그대로)
   const rosterNames = new Set(members.map(m => m.name)); // 유령 로그 배제(현재 명단만)
-  // 각 조원의 '최종 도달 일차'(global index). 로그 없으면 0.
-  const memberFrontier = {};
-  logs.forEach(l => {
-    if (!rosterNames.has(l.member_name)) return;
-    const g = toGlobalIndex(l.check_date);
-    if (!(l.member_name in memberFrontier) || g > memberFrontier[l.member_name]) {
-      memberFrontier[l.member_name] = g;
-    }
-  });
-  const frontierValues = Object.values(memberFrontier);
+  const rosterCount = members.length;
   const dailyCounts = {};
   logs.forEach(l => {
     if (!rosterNames.has(l.member_name)) return;
     if (!l.check_date.includes('-' + monthString + '-')) return;
     dailyCounts[l.check_date] = (dailyCounts[l.check_date] || 0) + 1;
   });
-  const getDayPercent = (dateStr) => {
-    const dayG = toGlobalIndex(dateStr);
-    const reached = frontierValues.filter(g => g >= dayG).length; // 그 일차 이상 도달한 인원
-    return reached > 0 ? Math.round(((dailyCounts[dateStr] || 0) / reached) * 100) : 0;
+  const getDayInfo = (dateStr) => {
+    if (rosterCount === 0) return { pct: 0, full: false };
+    const checked = dailyCounts[dateStr] || 0;
+    const full = checked >= rosterCount;                                  // 전원 체크한 날만 진짜 100%
+    const pct = full ? 100 : Math.min(Math.round((checked / rosterCount) * 100), 99);
+    return { pct, full };
   };
 
   // 주간 구분선용: [i] = (i+1)일차의 실제 달력 날짜
@@ -751,9 +743,9 @@ export default function GroupDashboard() {
                         const displayDate = readingDates[i] ? readingDates[i].getDate() : i + 1;
                         const dayKey = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
                         const isFutureDay = toGlobalIndex(dayKey) > todayGlobal;
-                        const dayPct = getDayPercent(dayKey);
-                        const isPerfect = !isFutureDay && dayPct === 100;                 // 완전체(전원 통독)
-                        const isLit = !isFutureDay && dayPct >= LIT_THRESHOLD;             // 점등(거의 전원)
+                        const { pct: dayPct, full: isFullColumn } = getDayInfo(dayKey);
+                        const isPerfect = !isFutureDay && isFullColumn;                   // 전원 체크 → 완전체
+                        const isLit = !isFutureDay && dayPct >= LIT_THRESHOLD;            // 90% 이상 점등
                         return (
                           <th
                             key={i}
