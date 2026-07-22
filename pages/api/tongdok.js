@@ -110,19 +110,26 @@ export default async function handler(req, res) {
         logsByGroup[l.group_id].push(l);
       }
 
-      const todayGlobal = getTodayGlobalIndex();
-      const isTodayReadingDay = new Date().getDay() !== 0;
-
       const groups = ALL_GROUP_IDS.map((gid) => {
         const groupMembers = membersByGroup[gid] || [];
         const groupLogs = logsByGroup[gid] || [];
 
-        const processed = groupMembers.map((m) => {
-          const memberLogs = groupLogs.filter((l) => l.member_name === m.name);
+        // 각 조원의 '최종 도달 일차' → 조 중앙값(groupFrontier) 기준으로 뒤처짐 판정.
+        // (오늘 날짜 기준이면 조 전체가 밀렸을 때 전원 비활성 → 타일 0% 붕괴. [id].js와 동일 규칙)
+        const latestByMember = groupMembers.map((m) => {
+          const ml = groupLogs.filter((l) => l.member_name === m.name);
+          return ml.length > 0 ? Math.max(...ml.map((l) => toGlobalIndex(l.check_date))) : 0;
+        });
+        const readFrontiers = latestByMember.filter((g) => g > 0).sort((a, b) => a - b);
+        const groupFrontier = readFrontiers.length
+          ? readFrontiers[Math.floor((readFrontiers.length - 1) / 2)]
+          : 0;
+
+        const processed = groupMembers.map((m, i) => {
+          const latestGlobal = latestByMember[i];
           let isInactive = false;
-          if (memberLogs.length > 0) {
-            const latestGlobal = Math.max(...memberLogs.map((l) => toGlobalIndex(l.check_date)));
-            const missed = Math.max(todayGlobal - latestGlobal - (isTodayReadingDay ? 1 : 0), 0);
+          if (latestGlobal > 0) {
+            const missed = Math.max(groupFrontier - latestGlobal, 0);
             if (missed >= 5) isInactive = true;
           } else {
             isInactive = true;
