@@ -5,6 +5,7 @@ const TOTAL_DAYS_BY_MONTH = {
   '7월': 27, '8월': 26, '9월': 26, '10월': 27, '11월': 23
 };
 const TOTAL_150_DAYS = 131; 
+const LIT_THRESHOLD = 90; // 이 % 이상이면 날짜에 불이 들어옴(거의 전원 통독). 100%는 별도 '완전체' 등급(✓ + 더 밝게)
 
 const ARTWORKS = {
   '150일': 'https://upload.wikimedia.org/wikipedia/commons/1/17/JEAN-FRAN%C3%87OIS_MILLET_-_El_%C3%81ngelus_%28Museo_de_Orsay%2C_1857-1859._%C3%93leo_sobre_lienzo%2C_55.5_x_66_cm%29.jpg',
@@ -751,7 +752,8 @@ export default function GroupDashboard() {
                         const dayKey = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
                         const isFutureDay = toGlobalIndex(dayKey) > todayGlobal;
                         const dayPct = getDayPercent(dayKey);
-                        const isFullDay = !isFutureDay && dayPct === 100;
+                        const isPerfect = !isFutureDay && dayPct === 100;                 // 완전체(전원 통독)
+                        const isLit = !isFutureDay && dayPct >= LIT_THRESHOLD;             // 점등(거의 전원)
                         return (
                           <th
                             key={i}
@@ -760,9 +762,11 @@ export default function GroupDashboard() {
                             onClick={(e) => handleTipClick(e, i)}
                             className={'py-3 px-2 font-mono text-[#71717A] cursor-pointer select-none' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}
                           >
-                            <div style={isFullDay ? { color: '#FFD700', textShadow: '0 0 6px rgba(255,215,0,0.9), 0 0 14px rgba(255,179,102,0.6), 0 0 24px rgba(255,179,102,0.35)' } : undefined}>{displayDate}</div>
-                            <div style={{ fontSize: '11px', marginTop: '2px', fontWeight: isFullDay ? 700 : 400, color: isFullDay ? '#FFD700' : '#52525B' }}>
-                              {isFutureDay ? '\u00A0' : isFullDay ? '100%✓' : dayPct + '%'}
+                            <div style={isLit ? { color: '#FFD700', textShadow: isPerfect
+                                ? '0 0 6px rgba(255,215,0,0.9), 0 0 14px rgba(255,179,102,0.6), 0 0 24px rgba(255,179,102,0.35)'
+                                : '0 0 5px rgba(255,215,0,0.5), 0 0 11px rgba(255,179,102,0.3)' } : undefined}>{displayDate}</div>
+                            <div style={{ fontSize: '11px', marginTop: '2px', fontWeight: isLit ? 700 : 400, color: isLit ? '#FFD700' : '#52525B' }}>
+                              {isFutureDay ? '\u00A0' : dayPct + '%' + (isPerfect ? '✓' : '')}
                             </div>
                           </th>
                         );
