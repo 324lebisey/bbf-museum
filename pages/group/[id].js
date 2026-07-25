@@ -141,6 +141,21 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
   const [mosaicGroups, setMosaicGroups] = useState([]);
   const [hoverGroup, setHoverGroup] = useState(null);
   const [tappedGroupId, setTappedGroupId] = useState(null); // 모바일: 1차 탭한 타일
+  const [aspect, setAspect] = useState('16/9'); // 그림 원본 비율. 로드 후 실제 비율로 교체
+
+  // 명화의 실제 가로/세로 비율을 읽어 모자이크 박스를 거기에 맞춤 (16:9 강제 안 함)
+  useEffect(() => {
+    if (!paintingSrc) return;
+    const img = new Image();
+    const apply = () => {
+      if (img.naturalWidth && img.naturalHeight) {
+        setAspect(img.naturalWidth + ' / ' + img.naturalHeight);
+      }
+    };
+    img.onload = apply;
+    img.src = paintingSrc;
+    if (img.complete) apply(); // 이미 캐시됐으면 즉시 반영
+  }, [paintingSrc]);
 
   useEffect(() => {
     if (!month) return;
@@ -186,7 +201,7 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
       </div>
       <div
         className="relative w-full rounded-xl overflow-hidden border border-[#27272A] flex flex-col"
-        style={{ aspectRatio: '16/9', background: '#000' }}
+        style={{ aspectRatio: aspect, background: '#000' }}
         onMouseLeave={() => { setHoverGroup(null); }}
       >
         {rows.map(({ colCount, items }, rowIdx) => (
