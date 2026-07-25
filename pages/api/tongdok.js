@@ -39,6 +39,15 @@ function getTodayGlobalIndex() {
   return idx;
 }
 
+// ── 집계 캐시(서버 메모리): 무거운 전체 풀스캔을 TTL 동안 재사용해 Neon 컴퓨트 절약 ──
+// Vercel 서버리스 인스턴스가 살아있는 동안만 유효(콜드스타트 시 자동 초기화).
+// 최대 TTL만큼 지연될 수 있으나, 2,000명 규모 집계는 초 단위 실시간일 필요가 없음.
+// 쓰기(check/uncheck/register) 시 무효화하지 않음 → 본인 체크는 fetchData(캐시 안 함)로 즉시 반영되고,
+// 전체 숫자·모자이크만 최대 TTL 지연됨.
+const AGG_CACHE_TTL_MS = 3 * 60 * 1000; // 3분
+const globalCache = {};    // { [key]: { at, data } }  key = month || '__ALL__'
+const allGroupsCache = {}; // { [month]: { at, data } }
+
 export default async function handler(req, res) {
   // Neon 환경변수 체크
   if (!process.env.DATABASE_URL) {
@@ -54,6 +63,12 @@ export default async function handler(req, res) {
     //    - 단일 카운터(global_counter) 방식은 폐기 → 중복 클릭으로 숫자가 부풀던 드리프트가 사라짐.
     //    - totalPeople(현재 등록 인원)을 함께 반환 → 프론트에서 분모로 사용, 이탈 시 목표 자동 감소.
    if (global === 'true') {
+      const cacheKey = month || '__ALL__';
+      const hit = globalCache[cacheKey];
+      if (hit && Date.now() - hit.at < AGG_CACHE_TTL_MS) {
+        return res.status(200).json(hit.data);
+      }
+
       const peopleResult = await sql`SELECT COUNT(*)::int AS people FROM group_members`;
       const people = peopleResult[0]?.people || 0;
 
@@ -78,7 +93,9 @@ export default async function handler(req, res) {
         count = r[0]?.c || 0;
       }
 
-      return res.status(200).json({ globalCount: count, totalPeople: people });
+      const payload = { globalCount: count, totalPeople: people };
+      globalCache[cacheKey] = { at: Date.now(), data: payload };
+      return res.status(200).json(payload);
     }
 
     // 1.5 94개조 모자이크용: 각 조의 이달 진행률을 한 번에 계산해서 반환
@@ -87,6 +104,10 @@ export default async function handler(req, res) {
     if (allGroups === 'true') {
       if (!month) {
         return res.status(400).json({ error: 'month 파라미터가 필요합니다. 예: 2026-08' });
+      }
+      const hit = allGroupsCache[month];
+      if (hit && Date.now() - hit.at < AGG_CACHE_TTL_MS) {
+        return res.status(200).json(hit.data);
       }
       const mm = Number(month.split('-')[1]);
       const monthLabel = mm + '월';
@@ -152,7 +173,9 @@ export default async function handler(req, res) {
         return { groupId: gid, percent: Number(percent.toFixed(1)) };
       });
 
-      return res.status(200).json({ groups });
+      const payload = { groups };
+      allGroupsCache[month] = { at: Date.now(), data: payload };
+      return res.status(200).json(payload);
     }
 
     if (!groupId) {
