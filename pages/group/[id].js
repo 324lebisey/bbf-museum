@@ -5,6 +5,7 @@ const TOTAL_DAYS_BY_MONTH = {
   '7월': 27, '8월': 26, '9월': 26, '10월': 27, '11월': 23
 };
 const TOTAL_150_DAYS = 131; 
+const FOCUS_REFETCH_COOLDOWN_MS = 3 * 60 * 1000; // 창 포커스 재조회 최소 간격(3분) — Neon 컴퓨트 절약
 const LIT_THRESHOLD = 90; // 90~99%는 은색(#D4D4D8)으로 표시. 100%만 금색(#FFD700) + 글로우 + ✓. 미만은 기존 회색
 
 const ARTWORKS = {
@@ -141,21 +142,6 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
   const [mosaicGroups, setMosaicGroups] = useState([]);
   const [hoverGroup, setHoverGroup] = useState(null);
   const [tappedGroupId, setTappedGroupId] = useState(null); // 모바일: 1차 탭한 타일
-  const [aspect, setAspect] = useState('16/9'); // 그림 원본 비율. 로드 후 실제 비율로 교체
-
-  // 명화의 실제 가로/세로 비율을 읽어 모자이크 박스를 거기에 맞춤 (16:9 강제 안 함)
-  useEffect(() => {
-    if (!paintingSrc) return;
-    const img = new Image();
-    const apply = () => {
-      if (img.naturalWidth && img.naturalHeight) {
-        setAspect(img.naturalWidth + ' / ' + img.naturalHeight);
-      }
-    };
-    img.onload = apply;
-    img.src = paintingSrc;
-    if (img.complete) apply(); // 이미 캐시됐으면 즉시 반영
-  }, [paintingSrc]);
 
   useEffect(() => {
     if (!month) return;
@@ -201,7 +187,7 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
       </div>
       <div
         className="relative w-full rounded-xl overflow-hidden border border-[#27272A] flex flex-col"
-        style={{ aspectRatio: aspect, background: '#000' }}
+        style={{ aspectRatio: '16/9', background: '#000' }}
         onMouseLeave={() => { setHoverGroup(null); }}
       >
         {rows.map(({ colCount, items }, rowIdx) => (
@@ -275,6 +261,7 @@ export default function GroupDashboard() {
   // ── 명단표: 헤더/본문 가로 스크롤 동기화용 ref (반드시 컴포넌트 내부에 있어야 Hook 규칙 준수) ──
   const headerScrollRef = useRef(null);
   const bodyScrollRef = useRef(null);
+  const lastFocusFetchRef = useRef(0); // 마지막 focus 재조회 시각 — 쿨다운으로 잦은 DB 깨움 방지
   const handleBodyScroll = () => {
     if (headerScrollRef.current && bodyScrollRef.current) {
       headerScrollRef.current.scrollLeft = bodyScrollRef.current.scrollLeft;
@@ -323,9 +310,13 @@ export default function GroupDashboard() {
   }, [currentMonth, activeTab]);
 
   // 창으로 돌아올 때(그새 다른 조가 체크했을 수 있으니) 최신화
+  // ※ 단, 3분 쿨다운 — alt-tab을 반복해도 그 안에서는 DB를 다시 깨우지 않음 (Neon 컴퓨트 절약)
   useEffect(() => {
     const onFocus = () => {
       if (!groupId) return;
+      const now = Date.now();
+      if (now - lastFocusFetchRef.current < FOCUS_REFETCH_COOLDOWN_MS) return;
+      lastFocusFetchRef.current = now;
       fetchGlobalProgress(currentMonthParam());
       fetchData(groupId);
     };
