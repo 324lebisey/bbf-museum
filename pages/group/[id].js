@@ -6,15 +6,47 @@ const TOTAL_DAYS_BY_MONTH = {
 };
 const TOTAL_150_DAYS = 131; 
 const LIT_THRESHOLD = 90; // 90~99%는 은색(#D4D4D8)으로 표시. 100%만 금색(#FFD700) + 글로우 + ✓. 미만은 기존 회색
+// Neon 무료 티어 대응: window focus 재조회 최소 간격. 폴링 금지 원칙(정본 §6)의 짝.
+// 2,000명 규모에서 alt-tab마다 2쿼리가 나가면 DB가 사실상 상시 깨어 CU-h가 월말 전 소진된다.
+const FOCUS_REFETCH_COOLDOWN_MS = 3 * 60 * 1000; // 3분
 
+// ── 명화 배치 ─────────────────────────────────────────────────────────
+// 한 달에 그림이 걸리는 자리는 셋이고, 8월부터는 자리마다 다른 그림을 건다.
+//   ① 우리 조 작품 탭 (조별 진도)        → ARTWORKS
+//   ② 이달의 명화 전시관 상단 (전체 진도) → ARTWORKS_EXHIBIT, 키 없으면 ARTWORKS로 폴백
+//   ③ 전시관 하단 94개조 모자이크        → ARTWORKS_MOSAIC,  키 없으면 ARTWORKS로 폴백
+// 오버라이드에 없는 달은 지금까지와 100% 동일하게 동작한다 (7·9·11월 무변경).
 const ARTWORKS = {
   '150일': 'https://upload.wikimedia.org/wikipedia/commons/1/17/JEAN-FRAN%C3%87OIS_MILLET_-_El_%C3%81ngelus_%28Museo_de_Orsay%2C_1857-1859._%C3%93leo_sobre_lienzo%2C_55.5_x_66_cm%29.jpg',
   '7월': 'https://upload.wikimedia.org/wikipedia/commons/5/5b/Michelangelo_-_Creation_of_Adam_%28cropped%29.jpg',
-  '8월': '/august.jpg',     
+  '8월': '/august-group.jpg',   // 포인터 《솔로몬 왕을 방문한 시바 여왕》 (왕상 10장)
   '9월': '/september.jpg',  
   '10월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Transfiguration_Raphael.jpg/960px-Transfiguration_Raphael.jpg',
   '11월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg/3840px-The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg'
 };
+
+// ② 전시관 상단 오버라이드
+const ARTWORKS_EXHIBIT = {
+  '8월': '/august-exhibit.jpg', // 클로드 로랭 《시바 여왕의 승선》 (왕상 10장)
+  // ⚠️ 파일명 주의: '/august.jpg'는 루벤스 《동방박사의 경배》다.
+  //    원래 8월용으로 넣었으나 마 2 / 눅 2 구간이 실제로는 10월(10/22 마 1-5, 10/30 눅 1-6)이라
+  //    10월 전시관으로 옮겼다. 파일 rename은 하지 않았으므로 이름('august') ≠ 역할(10월)이다.
+  '10월': '/august.jpg',
+};
+
+// ③ 모자이크 오버라이드. 10월은 키가 없으므로 ARTWORKS['10월'](라파엘로 《변용》)로 폴백된다.
+const ARTWORKS_MOSAIC = {
+  '8월': '/august-mosaic.jpg',  // 루벤스 《솔로몬의 재판》 (왕상 3장)
+};
+
+// 탭·월 → 실제로 걸 그림. 폴백은 항상 ARTWORKS.
+const getArtwork = (tab, month) => {
+  if (tab === '150일 대장정') return ARTWORKS['150일'];
+  if (tab === '이달의 명화 전시관') return ARTWORKS_EXHIBIT[month] || ARTWORKS[month];
+  return ARTWORKS[month];
+};
+const getMosaicArtwork = (month) => ARTWORKS_MOSAIC[month] || ARTWORKS[month];
+// ─────────────────────────────────────────────────────────────────────
 
 // ── 일일 통독 범위표 (키: '월-일' 실제 달력 날짜, 주일 제외) ──────────
 // 날짜 헤더 호버(PC)/탭(모바일) 시 툴팁으로 표시. 정적 상수라 DB·API 불필요.
@@ -275,6 +307,8 @@ export default function GroupDashboard() {
   // ── 명단표: 헤더/본문 가로 스크롤 동기화용 ref (반드시 컴포넌트 내부에 있어야 Hook 규칙 준수) ──
   const headerScrollRef = useRef(null);
   const bodyScrollRef = useRef(null);
+  // 마지막 focus 재조회 시각. Hook 규칙상 반드시 컴포넌트 함수 안에 있어야 한다(정본 §6).
+  const lastFocusFetchRef = useRef(0);
   const handleBodyScroll = () => {
     if (headerScrollRef.current && bodyScrollRef.current) {
       headerScrollRef.current.scrollLeft = bodyScrollRef.current.scrollLeft;
@@ -326,6 +360,9 @@ export default function GroupDashboard() {
   useEffect(() => {
     const onFocus = () => {
       if (!groupId) return;
+      const now = Date.now();
+      if (now - lastFocusFetchRef.current < FOCUS_REFETCH_COOLDOWN_MS) return;
+      lastFocusFetchRef.current = now;
       fetchGlobalProgress(currentMonthParam());
       fetchData(groupId);
     };
@@ -335,7 +372,11 @@ export default function GroupDashboard() {
 
   // 모든 명화를 미리 로드해 캐시에 넣어둠 → 탭/월 전환 시 그림이 즉시 바뀜
   useEffect(() => {
-    Object.values(ARTWORKS).forEach((src) => {
+    [
+      ...Object.values(ARTWORKS),
+      ...Object.values(ARTWORKS_EXHIBIT),
+      ...Object.values(ARTWORKS_MOSAIC),
+    ].forEach((src) => {
       const img = new Image();
       img.src = src;
     });
@@ -561,11 +602,17 @@ export default function GroupDashboard() {
           break;
         }
         case '8월': {
-          // 아기 예수(18% 67%)에서 작고 희미하게 시작 → 서서히 커짐
+          // 자리마다 그림이 달라 리빌 시작점도 다르다.
+          //  · 전시관 = 로랭 《시바 여왕의 승선》 → 수평선 위 새벽 해(50% 42%). 원화에 그려진
+          //    광원에서 빛이 퍼지는 연출. peak 램프로 초반엔 해가 희미하게 떠오름.
+          //  · 우리 조 = 포인터 《시바 여왕의 방문》 → 솔로몬의 상아 왕좌(68% 40%).
+          //    화면이 넓고 인물이 빽빽해 성장 곡선은 선형(core = percent) 유지.
+          const isExhibit = activeTab === '이달의 명화 전시관';
+          const aCenter = isExhibit ? '50% 42%' : '68% 40%';
           const aCore = Number(percent);                 // 완전 밝은 반경 (진행률 1:1)
           const aEdge = aCore + 4;                        // 페이드 폭 (작을수록 시작이 더 작음)
-          const peak = Math.min(1, Number(percent) / 6);  // 6%까진 반투명(희미), 이후 완전
-          maskValue = 'radial-gradient(circle at 18% 67%, rgba(0,0,0,' + peak + ') ' + aCore + '%, rgba(0,0,0,0) ' + aEdge + '%)';
+          const peak = isExhibit ? Math.min(1, Number(percent) / 6) : 1; // 6%까진 반투명(희미)
+          maskValue = 'radial-gradient(circle at ' + aCenter + ', rgba(0,0,0,' + peak + ') ' + aCore + '%, rgba(0,0,0,0) ' + aEdge + '%)';
           break;
         }
         case '9월': {
@@ -576,6 +623,17 @@ export default function GroupDashboard() {
           break;
         }
         case '10월': {
+          if (activeTab === '이달의 명화 전시관') {
+            // 전시관 = 루벤스 《동방박사의 경배》('/august.jpg'). 아기 예수(18% 67%)에서
+            // 작고 희미하게 시작 → 서서히 커짐. 기존 8월에 쓰던 값을 그대로 옮긴 것이므로
+            // 재튜닝 불필요. 좌표는 스크린샷으로 잡은 값이니 그대로 유지할 것.
+            const aCore = Number(percent);
+            const aEdge = aCore + 4;
+            const peak = Math.min(1, Number(percent) / 6);
+            maskValue = 'radial-gradient(circle at 18% 67%, rgba(0,0,0,' + peak + ') ' + aCore + '%, rgba(0,0,0,0) ' + aEdge + '%)';
+            break;
+          }
+          // 우리 조 = 라파엘로 《변용》 — 현행 그대로.
           // 밑에서 위로 차오름. 초반 밝은 면적의 진짜 원인은 페이드 폭이라 15 → 3으로 축소.
           const level = Math.pow(Number(percent) / 100, 1.8) * 100; // 차오르는 높이(지수 클수록 느림)
           const band = level + 3; // ★ 이 값이 '0.2%일 때 밝은 면적'을 좌우함
@@ -602,8 +660,10 @@ export default function GroupDashboard() {
     return { WebkitMaskImage: maskValue, maskImage: maskValue, opacity: 1 };
   };
 
-  const isLargeMonth = activeTab !== '150일 대장정' && ['7월', '8월', '9월', '11월'].includes(currentMonth);
-  const isOctober = activeTab !== '150일 대장정' && currentMonth === '10월';
+  // scale-110 확대 + 추가 패딩은 세로로 긴 라파엘로 《변용》 전용으로 잡은 값이다.
+  // 전시관 탭의 10월은 이제 가로 그림(동방박사)이라 확대하면 오히려 짤린다 → 일반 대형 취급.
+  const isOctober = activeTab === '우리 조 작품' && currentMonth === '10월';
+  const isLargeMonth = activeTab !== '150일 대장정' && !isOctober;
 
   // ── A/B 분리조 진입 차단 ──────────────────────────────
   // 17·22·26조는 A/B로만 운영되므로, 접미사 없는 맨숫자(?id=17 등)로 들어오면 진입을 막고
@@ -693,13 +753,13 @@ export default function GroupDashboard() {
             } : undefined}
           >  
             <img 
-              src={ARTWORKS[activeTab === '150일 대장정' ? '150일' : currentMonth]} 
+              src={getArtwork(activeTab, currentMonth)} 
               alt="Museum Base"
               className="w-full h-auto max-h-[80vh] object-contain filter grayscale brightness-[15%] block transition-all duration-300"
             />
             
             <img 
-              src={ARTWORKS[activeTab === '150일 대장정' ? '150일' : currentMonth]} 
+              src={getArtwork(activeTab, currentMonth)} 
               alt="Museum Color"
               style={getMaskStyle(progressPercent)}
               className="absolute inset-0 w-full h-full object-contain filter brightness(115%) contrast(105%) block transition-all duration-300"
@@ -715,7 +775,7 @@ export default function GroupDashboard() {
           {activeTab === '이달의 명화 전시관' && (
             <GroupMosaic
               month={'2026-' + currentMonth.replace('월', '').padStart(2, '0')}
-              paintingSrc={ARTWORKS[currentMonth]}
+              paintingSrc={getMosaicArtwork(currentMonth)}
               currentGroupId={groupId}
             />
           )}
