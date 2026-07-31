@@ -769,10 +769,8 @@ export default function GroupDashboard() {
           {/* 7월 명화 캡션 — 미켈란젤로 《아담의 창조》.
               ※ '150일 대장정' 탭은 currentMonth가 '7월'이어도 그림이 밀레 《만종》이므로 제외 */}
           {activeTab !== '150일 대장정' && currentMonth === '7월' && (
-            <div className="mt-6">
-              <div className="text-[15px] font-bold text-[#D4D4D8]">《아담의 창조》</div>
-              <div className="text-[13px] text-[#71717A] mt-1">미켈란젤로 부오나로티 · 1511년경</div>
-              <div className="text-[13px] text-[#52525B] mt-0.5">시스티나 경당 천장 프레스코, 바티칸</div>
+            <div className="mt-3">
+              <div className="text-[15px] font-bold text-[#D4D4D8]">《아담의 창조》 | 미켈란젤로 부오나로티 · 1511년경 | 시스티나 경당 천장 프레스코, 바티칸</div>
             </div>
           )}
           {/* 그림이 확대되었을 때 수치 마진이 겹치지 않도록 간격 최적화 */}
