@@ -608,7 +608,7 @@ export default function GroupDashboard() {
           //  · 우리 조 = 포인터 《시바 여왕의 방문》 → 솔로몬의 상아 왕좌(68% 40%).
           //    화면이 넓고 인물이 빽빽해 성장 곡선은 선형(core = percent) 유지.
           const isExhibit = activeTab === '이달의 명화 전시관';
-          const aCenter = isExhibit ? '50% 42%' : '68% 40%';
+          const aCenter = isExhibit ? '41% 56%' : '69% 42%';
           const aCore = Number(percent);                 // 완전 밝은 반경 (진행률 1:1)
           const aEdge = aCore + 4;                        // 페이드 폭 (작을수록 시작이 더 작음)
           const peak = isExhibit ? Math.min(1, Number(percent) / 6) : 1; // 6%까진 반투명(희미)
