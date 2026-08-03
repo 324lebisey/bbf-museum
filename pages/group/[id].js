@@ -334,6 +334,11 @@ export default function GroupDashboard() {
   // 전 조 진행률 { '2026-08': [{groupId, percent}] }. 모자이크와 타 조 갤러리 순회가 공용으로 쓴다.
   // 월별로 클라이언트에도 캐시 → 탭을 왕복해도 재요청이 나가지 않음.
   const [groupPercents, setGroupPercents] = useState({});
+  // 현재 들고 있는 전체 집계가 '어느 탭·월'의 것인지. 이게 없으면 탭/월을 바꾼 직후
+  // 이전 달 숫자로 마스크가 먼저 그려져 그림이 번쩍 밝아졌다가 어두워진다.
+  const [globalKey, setGlobalKey] = useState(null);
+  // 현재 명화의 로딩 완료 여부. 그림과 밝아진 부위가 동시에 나타나게 하는 데 쓴다.
+  const [loadedSrc, setLoadedSrc] = useState(null);
 
   // ── 통독 범위 툴팁: { i, x, y, text, pinned } ──
   // PC: 호버로 표시/이탈로 숨김. 모바일: 탭하면 고정(pinned), 같은 날짜 다시 탭하면 닫힘.
@@ -405,6 +410,18 @@ export default function GroupDashboard() {
     });
   }, [currentMonth, activeTab]);
 
+  // 현재 걸 그림이 실제로 디코딩까지 끝났는지 추적. onLoad 대신 별도 Image를 쓰는 이유는
+  // 캐시된 이미지에서 load 이벤트가 핸들러 부착 전에 끝나버리는 경우를 피하기 위함.
+  useEffect(() => {
+    const src = getArtwork(activeTab, currentMonth);
+    if (!src) return;
+    const img = new Image();
+    const done = () => setLoadedSrc(src);
+    img.onload = done;
+    img.src = src;
+    if (img.complete) done();
+  }, [activeTab, currentMonth]);
+
   const fetchData = async (targetGroupId) => {
     if (!targetGroupId) return;
     const res = await fetch(`/api/tongdok?groupId=${targetGroupId}&_cb=${Date.now()}`);
@@ -439,6 +456,7 @@ export default function GroupDashboard() {
     const result = await res.json();
     setAllGroupsLogsCount(result.globalCount || 0);
     setTotalPeople(result.totalPeople || 0);
+    setGlobalKey(month || '__ALL__'); // 이 숫자가 어느 탭·월의 것인지 표시
   };
 
   const handleRegisterMembers = async () => {
@@ -603,6 +621,15 @@ export default function GroupDashboard() {
   const isOwnGroupView = String(selectedGroupToggle) === String(groupId);
   const monthParamForPercents = '2026-' + monthString;
 
+  // ── 리빌 동기화 ────────────────────────────────────────
+  // 지금 화면의 탭·월에 해당하는 숫자가 실제로 도착했는지 판정한다.
+  // 도착 전에는 진도율을 0으로 취급 → 그림은 어두운 채로 대기하다가 데이터가 오면 한 번에 드러난다.
+  // (이 판정이 없으면 직전 탭·월의 숫자가 새 분모에 들어가 그림이 번쩍 밝아졌다 어두워진다)
+  const wantGlobalKey = activeTab === '150일 대장정' ? '__ALL__' : monthParamForPercents;
+  const globalReady = globalKey === wantGlobalKey;
+  const tourReady = isOwnGroupView || Boolean(groupPercents[monthParamForPercents]);
+  const progressReady = activeTab === '우리 조 작품' ? tourReady : globalReady;
+
   let progressPercent = 0;
   if (activeTab === '우리 조 작품') {
     if (isOwnGroupView) {
@@ -616,13 +643,13 @@ export default function GroupDashboard() {
       progressPercent = row ? row.percent : 0;
     }
   } else if (activeTab === '이달의 명화 전시관') {
-    // 분모 = 현재 등록 인원 × 그달 일수. totalPeople 로딩 전에는 0으로 안전 처리
+    // 분모 = 현재 등록 인원 × 그달 일수. 해당 월 집계가 도착하기 전에는 0(어두움)으로 대기
     const goal = totalPeople * targetDays;
-    progressPercent = goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
+    progressPercent = globalReady && goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
   } else {
     // 150일 대장정: 분모 = 현재 등록 인원 × 150일치
     const goal = totalPeople * TOTAL_150_DAYS;
-    progressPercent = goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
+    progressPercent = globalReady && goal > 0 ? (allGroupsLogsCount / goal) * 100 : 0;
   }
   progressPercent = Math.min(Number(progressPercent), 100).toFixed(1);
   const isComplete = activeTab === '우리 조 작품' && Number(progressPercent) >= 100;
@@ -706,6 +733,11 @@ export default function GroupDashboard() {
 
   // scale-110 확대 + 추가 패딩은 세로로 긴 라파엘로 《변용》 전용으로 잡은 값이다.
   // 전시관 탭의 10월은 이제 가로 그림(동방박사)이라 확대하면 오히려 짤린다 → 일반 대형 취급.
+  // 그림 로딩과 숫자 도착이 '둘 다' 끝나야 리빌을 시작한다 → 둘이 동시에 나타남.
+  // 어느 하나라도 미완이면 마스크에 0을 넘겨 컬러 레이어를 완전히 숨긴다(어두운 원본만 보임).
+  const artworkSrc = getArtwork(activeTab, currentMonth);
+  const revealReady = progressReady && loadedSrc === artworkSrc;
+
   const isOctober = activeTab === '우리 조 작품' && currentMonth === '10월';
   const isLargeMonth = activeTab !== '150일 대장정' && !isOctober;
 
@@ -797,15 +829,15 @@ export default function GroupDashboard() {
             } : undefined}
           >  
             <img 
-              src={getArtwork(activeTab, currentMonth)} 
+              src={artworkSrc} 
               alt="Museum Base"
               className="w-full h-auto max-h-[80vh] object-contain filter grayscale brightness-[15%] block transition-all duration-300"
             />
             
             <img 
-              src={getArtwork(activeTab, currentMonth)} 
+              src={artworkSrc} 
               alt="Museum Color"
-              style={getMaskStyle(progressPercent)}
+              style={getMaskStyle(revealReady ? progressPercent : 0)}
               className="absolute inset-0 w-full h-full object-contain filter brightness(115%) contrast(105%) block transition-all duration-300"
             />
 
@@ -822,7 +854,9 @@ export default function GroupDashboard() {
           <div className={'text-[15px] text-[#52525B] font-bold tracking-widest uppercase transition-all ' + (isOctober ? 'mt-10' : 'mt-6')}>
             {activeTab === '우리 조 작품' ? selectedGroupToggle + '조 ' + currentMonth + ' 진도율' : activeTab + ' 진척도'}
           </div>
-          <div className="text-5xl font-black text-[#E67E22] mt-1 tracking-tighter">{progressPercent}%</div>
+          <div className="text-5xl font-black text-[#E67E22] mt-1 tracking-tighter">
+            {progressReady ? progressPercent + '%' : '\u00B7\u00B7\u00B7'}
+          </div>
 
           {activeTab === '이달의 명화 전시관' && (
             <GroupMosaic
