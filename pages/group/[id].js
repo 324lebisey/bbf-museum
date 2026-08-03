@@ -98,6 +98,16 @@ const READING_PLAN = {
 // ── 일차(주일 제외) 유틸 ──────────────────────────────
 const MONTH_ORDER = ['7월', '8월', '9월', '10월', '11월'];
 
+// ── 월 개방 제어 ──────────────────────────────────────
+// 아직 오지 않은 달은 탭에서 감춘다. TOTAL_DAYS_BY_MONTH는 일차 계산의 원천이므로 손대지 않는다.
+// 목적: (1) 빈 달의 allGroups 풀스캔 차단 — 월별 캐시 키라 클릭 1회 = 전체 스캔 1회
+//       (2) 안 쓰는 명화 프리로드 제거 (Vercel 전송량)
+//       (3) 텅 빈 달을 보고 "기록이 사라졌다"는 문의 차단
+// ⚠️ 달을 열 때는 pages/api/tongdok.js의 OPEN_UNTIL_MONTH도 반드시 같이 수정 (두 파일에 중복 선언).
+const OPEN_UNTIL_MONTH = '8월';
+const _openCut = MONTH_ORDER.indexOf(OPEN_UNTIL_MONTH);
+const OPEN_MONTHS = _openCut < 0 ? MONTH_ORDER : MONTH_ORDER.slice(0, _openCut + 1);
+
 // 해당 월의 통독일 실제 날짜 배열 — [i]가 (i+1)일차의 달력 날짜 (주일 제외)
 const getReadingDates = (monthLabel) => {
   const m = Number(monthLabel.replace('월', ''));
@@ -169,8 +179,10 @@ function buildMosaicRowCounts(total, rows) {
 }
 const MOSAIC_ROW_COUNTS = buildMosaicRowCounts(94, MOSAIC_ROWS);
 
-function GroupMosaic({ month, paintingSrc, currentGroupId }) {
-  const [mosaicGroups, setMosaicGroups] = useState([]);
+// 집계 데이터는 부모(GroupDashboard)가 받아 prop으로 내려준다.
+// 타 조 갤러리 순회와 같은 데이터를 쓰므로, 여기서 따로 fetch하면 같은 달을 두 번 받게 된다.
+function GroupMosaic({ groups, paintingSrc, currentGroupId }) {
+  const mosaicGroups = groups || [];
   const [hoverGroup, setHoverGroup] = useState(null);
   const [tappedGroupId, setTappedGroupId] = useState(null); // 모바일: 1차 탭한 타일
   const [aspect, setAspect] = useState('16/9'); // 그림 원본 비율. 로드 후 실제 비율로 교체
@@ -188,14 +200,6 @@ function GroupMosaic({ month, paintingSrc, currentGroupId }) {
     img.src = paintingSrc;
     if (img.complete) apply(); // 이미 캐시됐으면 즉시 반영
   }, [paintingSrc]);
-
-  useEffect(() => {
-    if (!month) return;
-    fetch(`/api/tongdok?allGroups=true&month=${month}&_cb=${Date.now()}`)
-      .then((r) => r.json())
-      .then((data) => setMosaicGroups(data.groups || []))
-      .catch(() => setMosaicGroups([]));
-  }, [month]);
 
   if (mosaicGroups.length === 0) return null;
 
@@ -327,6 +331,9 @@ export default function GroupDashboard() {
   const [logs, setLogs] = useState([]);
   const [allGroupsLogsCount, setAllGroupsLogsCount] = useState(0);
   const [totalPeople, setTotalPeople] = useState(0); // 현재 등록 인원(분모). 이탈하면 자동으로 줄어듦
+  // 전 조 진행률 { '2026-08': [{groupId, percent}] }. 모자이크와 타 조 갤러리 순회가 공용으로 쓴다.
+  // 월별로 클라이언트에도 캐시 → 탭을 왕복해도 재요청이 나가지 않음.
+  const [groupPercents, setGroupPercents] = useState({});
 
   // ── 통독 범위 툴팁: { i, x, y, text, pinned } ──
   // PC: 호버로 표시/이탈로 숨김. 모바일: 탭하면 고정(pinned), 같은 날짜 다시 탭하면 닫힘.
@@ -351,6 +358,16 @@ export default function GroupDashboard() {
     if (groupId) fetchGlobalProgress(currentMonthParam());
   }, [groupId, activeTab, currentMonth]);
 
+  // 전 조 집계는 실제로 필요할 때만 받는다.
+  // 본인 조 체크판만 보는 기본 상태(대다수 사용자)에서는 요청이 0회다.
+  useEffect(() => {
+    if (!groupId) return;
+    const monthParam = '2026-' + currentMonth.replace('월', '').padStart(2, '0');
+    const needMosaic = activeTab === '이달의 명화 전시관';
+    const needTour = activeTab === '우리 조 작품' && String(selectedGroupToggle) !== String(groupId);
+    if (needMosaic || needTour) fetchGroupPercents(monthParam);
+  }, [groupId, activeTab, currentMonth, selectedGroupToggle]);
+
   // 월·탭이 바뀌면 열려있던 통독 범위 툴팁을 닫음 (날짜가 달라져 내용이 어긋나므로)
   useEffect(() => {
     setReadingTip(null);
@@ -370,17 +387,23 @@ export default function GroupDashboard() {
     return () => window.removeEventListener('focus', onFocus);
   }, [groupId, activeTab, currentMonth]);
 
-  // 모든 명화를 미리 로드해 캐시에 넣어둠 → 탭/월 전환 시 그림이 즉시 바뀜
+  // 현재 월의 세 자리(우리 조·전시관·모자이크)만 프리로드한다.
+  // 전 월치를 한 번에 받으면 방문 1회당 public/ 명화가 통째로 전송되어
+  // Vercel Fast Data Transfer(무료 100GB/30일)를 소진시킨다.
+  // 월을 바꾸면 이 effect가 다시 돌아 그 달 것만 받으므로 탭 전환 즉시성은 유지된다.
   useEffect(() => {
-    [
-      ...Object.values(ARTWORKS),
-      ...Object.values(ARTWORKS_EXHIBIT),
-      ...Object.values(ARTWORKS_MOSAIC),
-    ].forEach((src) => {
+    const srcs = new Set([
+      getArtwork('우리 조 작품', currentMonth),
+      getArtwork('이달의 명화 전시관', currentMonth),
+      getMosaicArtwork(currentMonth),
+    ]);
+    if (activeTab === '150일 대장정') srcs.add(ARTWORKS['150일']);
+    srcs.forEach((src) => {
+      if (!src) return;
       const img = new Image();
       img.src = src;
     });
-  }, []);
+  }, [currentMonth, activeTab]);
 
   const fetchData = async (targetGroupId) => {
     if (!targetGroupId) return;
@@ -398,6 +421,15 @@ export default function GroupDashboard() {
         setMemberInput(prev => (prev.trim() === '' ? currentNames : prev));
       }
     }
+  };
+
+  // 94개 조 진행률 집계. 이미 받은 달이면 요청하지 않는다.
+  const fetchGroupPercents = async (monthParam) => {
+    if (!monthParam || groupPercents[monthParam]) return;
+    const res = await fetch(`/api/tongdok?allGroups=true&month=${monthParam}&_cb=${Date.now()}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setGroupPercents((prev) => ({ ...prev, [monthParam]: data.groups || [] }));
   };
 
   // 월 파라미터를 받아 해당 월(또는 150일 전체) 전 조 집계 + 현재 등록 인원을 함께 받아옴
@@ -470,10 +502,10 @@ export default function GroupDashboard() {
     }
   };
 
+  // 타 조는 진행률 숫자만 allGroups 집계에서 꺼내 쓴다.
+  // (타 조 실명·개인별 체크 현황 노출 차단 + 조를 넘길 때마다 나가던 DB 쿼리 2회 제거)
   const handleGroupToggleChange = (e) => {
-    const target = e.target.value;
-    setSelectedGroupToggle(target);
-    fetchData(target);
+    setSelectedGroupToggle(e.target.value);
   };
 
   // ── 비활성 판정: '오늘 날짜'가 아니라 '조가 실제 도달한 지점(중앙값)' 기준 ──
@@ -568,9 +600,21 @@ export default function GroupDashboard() {
   };
   // ─────────────────────────────────────────────────────
 
+  const isOwnGroupView = String(selectedGroupToggle) === String(groupId);
+  const monthParamForPercents = '2026-' + monthString;
+
   let progressPercent = 0;
   if (activeTab === '우리 조 작품') {
-    progressPercent = groupTargetGoal > 0 ? ((groupCurrentChecked / groupTargetGoal) * 100) : 0;
+    if (isOwnGroupView) {
+      // 본인 조: 체크하는 즉시 %가 움직여야 하므로 실시간 계산 유지 (3분 캐시 사용 금지)
+      progressPercent = groupTargetGoal > 0 ? ((groupCurrentChecked / groupTargetGoal) * 100) : 0;
+    } else {
+      // 타 조: 서버가 §4.4와 동일한 로직으로 계산해 3분 캐싱해 둔 값을 그대로 사용
+      const row = (groupPercents[monthParamForPercents] || []).find(
+        (g) => String(g.groupId) === String(selectedGroupToggle)
+      );
+      progressPercent = row ? row.percent : 0;
+    }
   } else if (activeTab === '이달의 명화 전시관') {
     // 분모 = 현재 등록 인원 × 그달 일수. totalPeople 로딩 전에는 0으로 안전 처리
     const goal = totalPeople * targetDays;
@@ -718,7 +762,7 @@ export default function GroupDashboard() {
 
         {activeTab !== '150일 대장정' && (
           <div className="flex justify-center gap-1.5 mb-8 bg-[#121215]/50 p-1 rounded-lg border border-[#1F1F23]/60 max-w-xs mx-auto">
-            {Object.keys(TOTAL_DAYS_BY_MONTH).map(m => (
+            {OPEN_MONTHS.map(m => (
               <button
                 key={m}
                 onClick={() => setCurrentMonth(m)}
@@ -782,7 +826,7 @@ export default function GroupDashboard() {
 
           {activeTab === '이달의 명화 전시관' && (
             <GroupMosaic
-              month={'2026-' + currentMonth.replace('월', '').padStart(2, '0')}
+              groups={groupPercents['2026-' + currentMonth.replace('월', '').padStart(2, '0')]}
               paintingSrc={getMosaicArtwork(currentMonth)}
               currentGroupId={groupId}
             />
