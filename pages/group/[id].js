@@ -699,7 +699,7 @@ export default function GroupDashboard() {
       <div className="max-w-5xl mx-auto">
         
         <header className="text-center mb-10 pt-4">
-          <span className="text-xs font-semibold tracking-widest text-[#E67E22] uppercase border border-[#E67E22]/30 px-3 py-1 rounded-full bg-[#E67E22]/5">Bible Blessing Fellowship</span>
+          <span className="text-xs font-semibold tracking-widest text-[#E67E22] uppercase border border-[#E67E22]/30 px-3 py-1 rounded-full bg-[#E67E22]/5">BLESSING BIBLE FRIENDS</span>
           <h1 className="text-3xl md:text-4xl font-black text-[#F3F4F6] mt-4 tracking-tight">BBF 3기 성경통독 박물관</h1>
           <p className="text-sm text-[#71717A] mt-2 font-medium">{groupId}조 대시보드 — 말씀으로 완성되는 아름다운 명화 갤러리</p>
         </header>
