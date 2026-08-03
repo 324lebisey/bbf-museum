@@ -19,7 +19,10 @@ const FOCUS_REFETCH_COOLDOWN_MS = 3 * 60 * 1000; // 3분
 const ARTWORKS = {
   '150일': 'https://upload.wikimedia.org/wikipedia/commons/1/17/JEAN-FRAN%C3%87OIS_MILLET_-_El_%C3%81ngelus_%28Museo_de_Orsay%2C_1857-1859._%C3%93leo_sobre_lienzo%2C_55.5_x_66_cm%29.jpg',
   '7월': 'https://upload.wikimedia.org/wikipedia/commons/5/5b/Michelangelo_-_Creation_of_Adam_%28cropped%29.jpg',
-  '8월': '/august-group.jpg',   // 포인터 《솔로몬 왕을 방문한 시바 여왕》 (왕상 10장)
+  // 포인터 《솔로몬 왕을 방문한 시바 여왕》 (왕상 10장)
+  // public/august-group.jpg → 위키미디어 직링크로 이전 (Vercel Fast Data Transfer 절감).
+  // 로컬 사본은 백업으로 public/에 남겨 둔다 — 참조하지 않으면 전송 비용이 0이다.
+  '8월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/%27The_Visit_of_the_Queen_of_Sheba_to_King_Solomon%27%2C_oil_on_canvas_painting_by_Edward_Poynter%2C_1890%2C_Art_Gallery_of_New_South_Wales.jpg/1920px-%27The_Visit_of_the_Queen_of_Sheba_to_King_Solomon%27%2C_oil_on_canvas_painting_by_Edward_Poynter%2C_1890%2C_Art_Gallery_of_New_South_Wales.jpg',
   '9월': '/september.jpg',  
   '10월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Transfiguration_Raphael.jpg/960px-Transfiguration_Raphael.jpg',
   '11월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg/3840px-The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg'
@@ -27,7 +30,12 @@ const ARTWORKS = {
 
 // ② 전시관 상단 오버라이드
 const ARTWORKS_EXHIBIT = {
-  '8월': '/august-exhibit.jpg', // 클로드 로랭 《시바 여왕의 승선》 (왕상 10장)
+  // 클로드 로랭 《시바 여왕의 승선》 (왕상 10장)
+  // public/august-exhibit.jpg → 위키미디어 직링크로 이전. 원본이 1920px 미만이라 1280px가 최대치.
+  // 전시관 표시 폭이 max-w-5xl(≈1024px)이므로 충분하다.
+  // ⚠️ 커먼즈에 이 그림의 스캔본이 여러 개다(WGA판 등). 파일을 바꾸면 프레임이 달라져
+  //    마스크 중심 44% 49%가 어긋나므로, 교체 시 mask-lab.html로 좌표를 다시 잡을 것.
+  '8월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Claude_Lorrain_008.jpg/1280px-Claude_Lorrain_008.jpg',
   // ⚠️ 파일명 주의: '/august.jpg'는 루벤스 《동방박사의 경배》다.
   //    원래 8월용으로 넣었으나 마 2 / 눅 2 구간이 실제로는 10월(10/22 마 1-5, 10/30 눅 1-6)이라
   //    10월 전시관으로 옮겼다. 파일 rename은 하지 않았으므로 이름('august') ≠ 역할(10월)이다.
@@ -36,7 +44,10 @@ const ARTWORKS_EXHIBIT = {
 
 // ③ 모자이크 오버라이드. 10월은 키가 없으므로 ARTWORKS['10월'](라파엘로 《변용》)로 폴백된다.
 const ARTWORKS_MOSAIC = {
-  '8월': '/august-mosaic.jpg',  // 루벤스 《솔로몬의 재판》 (왕상 3장)
+  // 루벤스 《솔로몬의 재판》 (왕상 3장). 모자이크는 타일당 가로 1/14로 잘린 뒤 backgroundSize로
+  // 1400% 확대해 쓰므로 원본 해상도를 키워도 화질 이득이 없다 → 1920px 대신 1280px.
+  // (URL의 숫자만 바꾸면 위키미디어가 어떤 폭이든 즉시 생성해 준다)
+  '8월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Peter_Paul_Rubens_-_The_Judgement_of_Solomon_-_Google_Art_Project.jpg/1280px-Peter_Paul_Rubens_-_The_Judgement_of_Solomon_-_Google_Art_Project.jpg',
 };
 
 // 탭·월 → 실제로 걸 그림. 폴백은 항상 ARTWORKS.
