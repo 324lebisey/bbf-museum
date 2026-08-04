@@ -119,6 +119,16 @@ const OPEN_UNTIL_MONTH = '8월';
 const _openCut = MONTH_ORDER.indexOf(OPEN_UNTIL_MONTH);
 const OPEN_MONTHS = _openCut < 0 ? MONTH_ORDER : MONTH_ORDER.slice(0, _openCut + 1);
 
+// 진입 시 기본으로 열릴 달 = 오늘이 속한 달.
+// 반드시 OPEN_MONTHS 안에서만 고른다 — 개방되지 않은 달을 초기값으로 잡으면
+// 월 버튼이 렌더되지 않아 아무것도 선택 안 된 상태가 되고, 빈 달의 집계 쿼리가 나간다.
+// 7월 이전(준비 기간)이면 첫 달, 프로그램 종료 후·미개방 달이면 개방된 마지막 달로 클램프.
+const getDefaultMonth = () => {
+  const label = (new Date().getMonth() + 1) + '월';
+  if (OPEN_MONTHS.includes(label)) return label;
+  return (new Date().getMonth() + 1) < 7 ? OPEN_MONTHS[0] : OPEN_MONTHS[OPEN_MONTHS.length - 1];
+};
+
 // 해당 월의 통독일 실제 날짜 배열 — [i]가 (i+1)일차의 달력 날짜 (주일 제외)
 const getReadingDates = (monthLabel) => {
   const m = Number(monthLabel.replace('월', ''));
@@ -360,6 +370,13 @@ export default function GroupDashboard() {
   // 현재 탭·월에 맞는 global 조회용 월 파라미터 (150일 대장정이면 null → 전체 집계)
   const currentMonthParam = () =>
     activeTab === '150일 대장정' ? null : '2026-' + currentMonth.replace('월', '').padStart(2, '0');
+
+  // 진입 시 현재 달로 이동. useState 초기값이 아니라 mount 후 1회 setState로 처리한다
+  // — 초기값으로 넣으면 빌드 시점 달이 HTML에 구워져 hydration 불일치가 난다.
+  // 이 시점엔 아직 router.query가 비어 groupId가 없으므로 불필요한 7월 집계 요청도 나가지 않는다.
+  useEffect(() => {
+    setCurrentMonth(getDefaultMonth());
+  }, []);
 
   // 조 번호가 정해지면 우리 조 데이터 로드
   useEffect(() => {
