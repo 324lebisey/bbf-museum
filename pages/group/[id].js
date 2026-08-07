@@ -23,7 +23,11 @@ const FOCUS_REFETCH_COOLDOWN_MS = 3 * 60 * 1000; // 3분
 // ⚠️ 이것은 '보안'이 아니라 '오진입 방지 게이트'다. 키는 클라이언트 번들에 그대로 들어가고,
 //    주소를 직접 치면 누구나 /group/59로 들어갈 수 있다. 실제 차단은 서버측 PIN 게이트가 필요.
 const ADMIN_KEY = 'bbf-admin-2026';
-const ADMIN_QUERY = '?admin=' + ADMIN_KEY;   // 타 조로 이동할 때 그대로 이어붙여 순회를 유지
+const ADMIN_QUERY = '?admin=' + ADMIN_KEY;
+// 타일에서 타 조로 넘어갈 때 쓰는 주소. &tab=group이 붙으면 도착지에서 전시관으로 튕기지 않고
+// 그 조의 '우리 조 작품'(체크판)이 바로 열린다 — 타일을 누르는 목적이 그 조를 들여다보는 것이므로.
+// 운영자 권한(?admin=)은 그대로 따라가므로 거기서 다시 전시관 탭을 눌러 다음 조로 넘어갈 수 있다.
+const ADMIN_TOUR_QUERY = ADMIN_QUERY + '&tab=group';
 
 // ── 명화 배치 ─────────────────────────────────────────────────────────
 // 한 달에 그림이 걸리는 자리는 셋이고, 8월부터는 자리마다 다른 그림을 건다.
@@ -250,7 +254,7 @@ function GroupMosaic({ groups, paintingSrc, currentGroupId, isAdmin }) {
     if (tappedGroupId === g.groupId) {
       // 운영자 쿼리를 목적지에도 이어붙인다. 안 붙이면 다음 조에서 즉시 일반 사용자가 되어
       // 모자이크 순회가 한 번 만에 끊긴다 (localStorage를 쓰지 않으므로 주소가 유일한 상태).
-      window.location.href = `/group/${g.groupId}${ADMIN_QUERY}`;
+      window.location.href = `/group/${g.groupId}${ADMIN_TOUR_QUERY}`;
       return;
     }
     setTappedGroupId(g.groupId);
@@ -403,10 +407,12 @@ export default function GroupDashboard() {
   // (useState 초기값이 아니라 여기서 setState 하는 이유: 정적 프리렌더 HTML과 어긋나면
   //  hydration 불일치가 난다. currentMonth를 mount effect로 넣는 것과 같은 이유.)
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get('admin');
-    if (q !== ADMIN_KEY) return;   // 일반 사용자: isAdmin=false, activeTab 기본값 그대로
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('admin') !== ADMIN_KEY) return; // 일반 사용자: isAdmin=false, 탭 기본값 그대로
     setIsAdmin(true);
-    setActiveTab('이달의 명화 전시관');
+    // 북마크(?admin=만) → 전시관에서 시작. 타일 이동(&tab=group) → 그 조 체크판에서 시작.
+    // 이 분기가 없으면 타일을 눌러도 도착지가 또 전시관이라 '이동이 안 된다'로 보인다.
+    if (params.get('tab') !== 'group') setActiveTab('이달의 명화 전시관');
   }, []);
 
   // 진입 시 현재 달로 이동. useState 초기값이 아니라 mount 후 1회 setState로 처리한다
