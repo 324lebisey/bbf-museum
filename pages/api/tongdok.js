@@ -135,8 +135,11 @@ export default async function handler(req, res) {
         const groupMembers = membersByGroup[gid] || [];
         const groupLogs = logsByGroup[gid] || [];
 
-        // 각 조원의 '최종 도달 일차' → 조 중앙값(groupFrontier) 기준으로 뒤처짐 판정.
-        // (오늘 날짜 기준이면 조 전체가 밀렸을 때 전원 비활성 → 타일 0% 붕괴. [id].js와 동일 규칙)
+        // ── 진도율 모집단 = 현재 명단 전체 ([id].js와 동일 규칙) ──
+        // 중도탈락자를 DB에서 정리했으므로 뒤처진 사람을 분모에서 빼지 않는다.
+        // 활성 멤버(중앙값 기준 5일 이상 뒤처짐 제외) 분모를 쓰던 옛 로직은 아래 주석에 보존.
+        // 되살리려면 이 블록을 지우고 주석을 해제할 것 — 단 [id].js §4.4도 함께 되돌려야 한다.
+        /*
         const latestByMember = groupMembers.map((m) => {
           const ml = groupLogs.filter((l) => l.member_name === m.name);
           return ml.length > 0 ? Math.max(...ml.map((l) => toGlobalIndex(l.check_date))) : 0;
@@ -145,7 +148,6 @@ export default async function handler(req, res) {
         const groupFrontier = readFrontiers.length
           ? readFrontiers[Math.floor((readFrontiers.length - 1) / 2)]
           : 0;
-
         const processed = groupMembers.map((m, i) => {
           const latestGlobal = latestByMember[i];
           let isInactive = false;
@@ -157,13 +159,14 @@ export default async function handler(req, res) {
           }
           return { name: m.name, isInactive };
         });
-
         const activeNames = new Set(processed.filter((m) => !m.isInactive).map((m) => m.name));
-        const activeCount = activeNames.size;
-        const groupTargetGoal = activeCount * targetDays;
+        */
+
+        const rosterNames = new Set(groupMembers.map((m) => m.name)); // 유령 로그 배제
+        const groupTargetGoal = groupMembers.length * targetDays;
 
         const groupCurrentChecked = groupLogs.filter(
-          (l) => activeNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
+          (l) => rosterNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
         ).length;
 
         const percent = groupTargetGoal > 0
