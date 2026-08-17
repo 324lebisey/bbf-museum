@@ -668,7 +668,7 @@ export default function GroupDashboard() {
         // 잠금 조인데 PIN이 없거나 틀림(조장이 PIN을 바꿨을 수도 있다) → 세션 폐기 후 재인증 유도.
         clearLeaderPin();
         setCheckLock(true);
-        alert('이 조는 조장만 체크할 수 있습니다. 위의 [조장 인증]을 눌러 PIN을 입력해 주세요.');
+        alert('이 조는 조장만 체크할 수 있습니다. 페이지 맨 위의 [🔒 조장 인증]을 눌러 PIN을 입력해 주세요.');
         await fetchData(groupId); // 눌린 체크박스를 서버 상태로 되돌림
       } else {
         alert("저장에 실패했습니다.");
@@ -947,7 +947,19 @@ export default function GroupDashboard() {
               🔑 운영자 모드 · 모자이크 타일로 타 조 이동 가능
             </div>
           )}
-          {/* 조장 모드도 반드시 눈에 보이게 한다 — 저장된 상태를 추론하게 두면 안 된다(정본 §4.9) */}
+          {/* ── 체크판 잠금: 인증 버튼 ↔ 조장 모드 배지가 '같은 자리'에서 전환된다 ──
+              잠금 조에서 미인증이면 버튼, 인증 후엔 배지. 상태를 추론하게 두지 않는다(정본 §4.9).
+              잠금 신청을 하지 않은 조는 checkLock=false라 둘 다 렌더되지 않는다. */}
+          {checkLock && !leaderPin && (
+            <div className="mt-3">
+              <button
+                onClick={handleUnlockCheckboard}
+                className="inline-block text-xs font-bold tracking-widest text-[#FFB366] border border-[#FFB366]/40 bg-[#FFB366]/10 hover:bg-[#FFB366]/20 px-3 py-1 rounded-full transition-colors"
+              >
+                🔒 조장 인증
+              </button>
+            </div>
+          )}
           {leaderPin && (
             <div className="mt-3 inline-block text-xs font-bold tracking-widest text-[#FFB366] border border-[#FFB366]/40 bg-[#FFB366]/10 px-3 py-1 rounded-full">
               🔓 {groupId}조 조장 모드
@@ -1053,16 +1065,6 @@ export default function GroupDashboard() {
               </h3>
             </div>
             
-            {/* 체크판 잠금 — 잠금 조에서만 노출. 안내 문구 없이 버튼만 둔다(운영자 지시).
-                인증 전엔 체크박스가 disabled 상태다. */}
-            {checkLock && !leaderPin && (
-              <div className="mb-4 flex justify-end">
-                <button onClick={handleUnlockCheckboard} className="bg-[#E67E22] hover:bg-[#D35400] text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">
-                  🔒 조장 인증
-                </button>
-              </div>
-            )}
-
             <div className="flex gap-2 mb-6">
               <input type="text" value={memberInput} onChange={(e) => setMemberInput(e.target.value)} placeholder="조원 이름을 쉼표로 구분하여 입력 (예: 최경미, 이지민, 홍길동)" className="flex-1 bg-[#18181C] border border-[#27272A] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#E67E22] placeholder:text-[#3F3F46]" />
               <button onClick={handleRegisterMembers} className="bg-[#E67E22] hover:bg-[#D35400] text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-[#E67E22]/10">명단 저장</button>
