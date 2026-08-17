@@ -48,6 +48,35 @@ const AGG_CACHE_TTL_MS = 3 * 60 * 1000; // 3분
 const globalCache = {};    // { [key]: { at, data } }  key = month || '__ALL__'
 const allGroupsCache = {}; // { [month]: { at, data } }
 
+// ── 조별 체크판 잠금 설정 캐시(서버 메모리) ──
+// check/uncheck마다 group_settings를 읽으면 쓰기 경로가 2쿼리 → 3쿼리가 된다.
+// 잠금 플래그·PIN은 사실상 바뀌지 않으므로 5분 캐싱해 원래 쿼리 수로 되돌린다.
+// (SQL로 잠금을 켜고 끄면 최대 5분 뒤 반영됨 — 무해)
+// ⚠️ register에서 PIN을 새로 INSERT하면 반드시 무효화할 것.
+const SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5분
+const settingsCache = {}; // { [groupId]: { at, row } }
+
+async function getGroupSettings(sql, groupId) {
+  const hit = settingsCache[groupId];
+  if (hit && Date.now() - hit.at < SETTINGS_CACHE_TTL_MS) return hit.row;
+  const rows = await sql`SELECT roster_pin, check_lock FROM group_settings WHERE group_id = ${groupId}`;
+  const row = rows[0] || null;
+  settingsCache[groupId] = { at: Date.now(), row };
+  return row;
+}
+
+// 잠금 조에서만 PIN을 요구한다. 잠금이 아니면 무조건 통과 = 기존 동작 그대로.
+// MASTER_PIN(환경변수)은 조장 부재 시 운영자가 대신 체크하기 위한 만능키.
+// ?admin= 은 클라이언트 값이라 서버가 신뢰할 수 없으므로 여기에 쓰지 않는다.
+function verifyCheckPin(row, pin) {
+  if (!row || row.check_lock !== true) return true;
+  const given = String(pin || '').trim();
+  if (!given) return false;
+  if (given === row.roster_pin) return true;
+  const master = String(process.env.MASTER_PIN || '').trim();
+  return Boolean(master) && given === master;
+}
+
 export default async function handler(req, res) {
   // Neon 환경변수 체크
   if (!process.env.DATABASE_URL) {
@@ -198,7 +227,11 @@ export default async function handler(req, res) {
         WHERE group_id = ${groupId} 
         ORDER BY check_date ASC`;
       
-      return res.status(200).json({ members, logs });
+      // 프론트가 체크박스를 잠글지 판단할 플래그. 잠금이 아니면 false.
+      const settings = await getGroupSettings(sql, groupId);
+      const checkLock = settings ? settings.check_lock === true : false;
+
+      return res.status(200).json({ members, logs, checkLock });
     }
 
     // 3. 데이터 저장 및 변경 (POST)
@@ -218,6 +251,7 @@ export default async function handler(req, res) {
         const pinRows = await sql`SELECT roster_pin FROM group_settings WHERE group_id = ${groupId}`;
         if (pinRows.length === 0) {
           await sql`INSERT INTO group_settings (group_id, roster_pin) VALUES (${groupId}, ${trimmedPin})`;
+          delete settingsCache[groupId]; // 새 PIN이 캐시에 반영되도록 무효화
         } else if (pinRows[0].roster_pin !== trimmedPin) {
           return res.status(403).json({ error: 'PIN이 일치하지 않습니다. 명단 변경은 조장에게 문의하세요.' });
         }
@@ -234,6 +268,31 @@ export default async function handler(req, res) {
         }
 
         return res.status(200).json({ success: true, members: updatedMembers });
+      }
+
+      // [Action A-2] 조장 인증만 확인 (체크판 잠금 해제용). DB를 바꾸지 않는다.
+      if (action === 'unlock') {
+        const settings = await getGroupSettings(sql, groupId);
+        if (!settings || settings.check_lock !== true) {
+          return res.status(200).json({ ok: true, checkLock: false });
+        }
+        if (!verifyCheckPin(settings, req.body.pin)) {
+          return res.status(403).json({ error: 'PIN이 일치하지 않습니다.', needPin: true });
+        }
+        return res.status(200).json({ ok: true, checkLock: true });
+      }
+
+      // ── 체크판 쓰기 잠금 게이트 ──
+      // check_lock = true 인 조만 PIN을 요구한다. 나머지 조는 이 블록을 그대로 통과.
+      // 프론트의 disabled는 UX일 뿐이고, 실제 차단은 여기서만 일어난다.
+      if (action === 'check' || action === 'uncheck') {
+        const settings = await getGroupSettings(sql, groupId);
+        if (!verifyCheckPin(settings, req.body.pin)) {
+          return res.status(403).json({
+            error: '이 조는 조장만 체크할 수 있습니다. 조장 PIN을 입력해 주세요.',
+            needPin: true,
+          });
+        }
       }
 
       // [Action B] 날짜별 성경통독 체크박스 ON
