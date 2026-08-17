@@ -10,6 +10,16 @@ const LIT_THRESHOLD = 90; // 90~99%는 은색(#D4D4D8)으로 표시. 100%만 금
 // 2,000명 규모에서 alt-tab마다 2쿼리가 나가면 DB가 사실상 상시 깨어 CU-h가 월말 전 소진된다.
 const FOCUS_REFETCH_COOLDOWN_MS = 3 * 60 * 1000; // 3분
 
+// ── 조장 모드(체크판 잠금 해제) 세션 ──────────────────
+// 조장이 요청한 조만 group_settings.check_lock = true 가 되고, 그 조는 체크/언체크에
+// 서버가 조장 PIN(= 명단 저장에 쓰는 roster_pin)을 요구한다.
+// 인증에 성공하면 PIN을 브라우저에 저장해 매번 입력하지 않게 한다.
+// ⚠️ 키에 조 번호를 붙인다(`bbf_pin_87`). 운영자 모드 localStorage 사고(정본 §4.9)의 원인은
+//    '브라우저 전역 플래그 + 화면에 안 보임'이었다. 여기선 조별로만 열리고,
+//    열려 있으면 헤더에 배지가 뜬다 → 상태가 눈에 보인다.
+const PIN_STORE_KEY = (gid) => 'bbf_pin_' + gid;
+const PIN_SESSION_EXPIRES_AT = new Date('2026-11-28T00:00:00+09:00').getTime(); // 프로그램 종료 후 자동 만료
+
 // ── 운영자 모드 ────────────────────────────────────────
 // 모자이크 타일 → 타 조 이동은 운영자만. 일반 참여자는 조 번호·진행률 표시까지만 된다.
 //
@@ -390,6 +400,10 @@ export default function GroupDashboard() {
   // 운영자 모드. 반드시 false로 시작해 mount effect에서만 켠다 —
   // useState 초기값에서 window.location을 읽으면 서버 렌더와 어긋나 hydration 불일치가 난다.
   const [isAdmin, setIsAdmin] = useState(false);
+  // 이 조가 체크판 잠금 조인가 (서버 GET 응답의 checkLock). 본인 조 데이터일 때만 갱신.
+  const [checkLock, setCheckLock] = useState(false);
+  // 인증된 조장 PIN. null이면 미인증. localStorage에서 mount 후에 읽는다(hydration 불일치 방지).
+  const [leaderPin, setLeaderPin] = useState(null);
 
   // ── 통독 범위 툴팁: { i, x, y, text, pinned } ──
   // PC: 호버로 표시/이탈로 숨김. 모바일: 탭하면 고정(pinned), 같은 날짜 다시 탭하면 닫힘.
@@ -427,6 +441,24 @@ export default function GroupDashboard() {
     if (groupId) {
       setSelectedGroupToggle(groupId);
       fetchData(groupId);
+    }
+  }, [groupId]);
+
+  // 저장된 조장 PIN 복원. 조 번호가 바뀌면 다시 읽는다(다른 조로 새지 않음).
+  useEffect(() => {
+    if (!groupId) return;
+    try {
+      const raw = localStorage.getItem(PIN_STORE_KEY(groupId));
+      if (!raw) { setLeaderPin(null); return; }
+      const saved = JSON.parse(raw);
+      if (!saved || !saved.pin || (saved.exp && Date.now() > saved.exp)) {
+        localStorage.removeItem(PIN_STORE_KEY(groupId));
+        setLeaderPin(null);
+        return;
+      }
+      setLeaderPin(saved.pin);
+    } catch (e) {
+      setLeaderPin(null);
     }
   }, [groupId]);
 
@@ -512,6 +544,7 @@ export default function GroupDashboard() {
       // → PIN 등록·조원 한 명 추가 등에 전체 재입력이 필요 없어짐.
       //   (타 조 갤러리 순회 데이터로는 절대 채우지 않음 / 입력 중인 내용은 덮어쓰지 않음)
       if (String(targetGroupId) === String(groupId)) {
+        setCheckLock(result.checkLock === true); // 잠금 여부는 우리 조 것만 신뢰
         const currentNames = result.members.map(m => m.name).join(', ');
         setMemberInput(prev => (prev.trim() === '' ? currentNames : prev));
       }
@@ -537,6 +570,40 @@ export default function GroupDashboard() {
     setGlobalKey(month || '__ALL__'); // 이 숫자가 어느 탭·월의 것인지 표시
   };
 
+  // 조장 인증: PIN을 서버에 검증만 시키고(DB 변경 없음) 통과하면 브라우저에 저장한다.
+  const handleUnlockCheckboard = async () => {
+    const input = window.prompt('조장 PIN을 입력하세요.\n※ 명단 저장에 쓰는 PIN과 같습니다.');
+    if (input === null) return;
+    const pin = input.trim();
+    if (pin.length < 4) {
+      alert('PIN은 4자리 이상이어야 합니다.');
+      return;
+    }
+    const res = await fetch(`/api/tongdok?groupId=${groupId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'unlock', pin })
+    });
+    if (!res.ok) {
+      alert('PIN이 일치하지 않습니다. 조장님께 문의해 주세요.');
+      return;
+    }
+    saveLeaderPin(pin);
+    alert('조장 모드가 켜졌습니다. 이제 체크할 수 있어요.');
+  };
+
+  const saveLeaderPin = (pin) => {
+    try {
+      localStorage.setItem(PIN_STORE_KEY(groupId), JSON.stringify({ pin, exp: PIN_SESSION_EXPIRES_AT }));
+    } catch (e) { /* 저장 실패해도 이번 세션에서는 동작 */ }
+    setLeaderPin(pin);
+  };
+
+  const clearLeaderPin = () => {
+    try { localStorage.removeItem(PIN_STORE_KEY(groupId)); } catch (e) {}
+    setLeaderPin(null);
+  };
+
   const handleRegisterMembers = async () => {
     // 조 번호(groupId)가 비어있거나 인식이 안 되었으면 즉시 중단합니다.
     if (!groupId) {
@@ -548,11 +615,16 @@ export default function GroupDashboard() {
     if (!confirm(`${groupId}조 명단을 변경하시겠습니까? 기존 기록은 이름이 일치하면 유지됩니다.`)) return;
 
     // ── 조장 PIN: 이 조의 첫 저장이면 지금 입력한 PIN이 등록되고, 이후엔 일치해야만 저장됨 ──
-    const pin = window.prompt('조장 PIN을 입력하세요 (4자리 이상).\n※ 이 조의 첫 저장이라면 지금 입력한 PIN이 조장 PIN으로 등록됩니다. 조장님만 알고 계세요!');
-    if (pin === null) return; // 취소
-    if (pin.trim().length < 4) {
-      alert('PIN은 4자리 이상이어야 합니다.');
-      return;
+    // 이미 조장 모드로 인증돼 있으면 다시 묻지 않는다 (체크판 잠금과 같은 PIN이므로).
+    let pin = leaderPin;
+    if (!pin) {
+      const input = window.prompt('조장 PIN을 입력하세요 (4자리 이상).\n※ 이 조의 첫 저장이라면 지금 입력한 PIN이 조장 PIN으로 등록됩니다. 조장님만 알고 계세요!');
+      if (input === null) return; // 취소
+      pin = input.trim();
+      if (pin.length < 4) {
+        alert('PIN은 4자리 이상이어야 합니다.');
+        return;
+      }
     }
     
     const nameList = memberInput.split(',').map(n => n.trim()).filter(n => n !== '');
@@ -560,10 +632,11 @@ export default function GroupDashboard() {
     const response = await fetch(`/api/tongdok?groupId=${groupId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'register', names: nameList, pin: pin.trim() })
+      body: JSON.stringify({ action: 'register', names: nameList, pin })
     });
 
     if (response.ok) {
+      saveLeaderPin(pin); // 저장에 성공한 PIN = 이 조의 유효한 조장 PIN
       alert('명단이 성공적으로 저장되었습니다!');
       await fetchData(groupId);
       await fetchGlobalProgress(currentMonthParam());
@@ -583,13 +656,20 @@ export default function GroupDashboard() {
         body: JSON.stringify({ 
           action: isChecked ? 'check' : 'uncheck', 
           name: memberName, 
-          date: dateStr 
+          date: dateStr,
+          pin: leaderPin || undefined   // 잠금 조가 아니면 서버가 무시한다
         })
       });
 
       if (response.ok) {
         await fetchData(groupId);
         await fetchGlobalProgress(currentMonthParam());
+      } else if (response.status === 403) {
+        // 잠금 조인데 PIN이 없거나 틀림(조장이 PIN을 바꿨을 수도 있다) → 세션 폐기 후 재인증 유도.
+        clearLeaderPin();
+        setCheckLock(true);
+        alert('이 조는 조장만 체크할 수 있습니다. 위의 [조장 인증]을 눌러 PIN을 입력해 주세요.');
+        await fetchData(groupId); // 눌린 체크박스를 서버 상태로 되돌림
       } else {
         alert("저장에 실패했습니다.");
       }
@@ -867,6 +947,13 @@ export default function GroupDashboard() {
               🔑 운영자 모드 · 모자이크 타일로 타 조 이동 가능
             </div>
           )}
+          {/* 조장 모드도 반드시 눈에 보이게 한다 — 저장된 상태를 추론하게 두면 안 된다(정본 §4.9) */}
+          {leaderPin && (
+            <div className="mt-3 inline-block text-xs font-bold tracking-widest text-[#FFB366] border border-[#FFB366]/40 bg-[#FFB366]/10 px-3 py-1 rounded-full">
+              🔓 {groupId}조 조장 모드
+              <button onClick={clearLeaderPin} className="ml-2 underline text-[#A1A1AA] hover:text-[#F3F4F6]">해제</button>
+            </div>
+          )}
         </header>
 
         <div className="flex justify-center gap-1 mb-6 bg-[#121215] p-1.5 rounded-xl border border-[#1F1F23] max-w-md mx-auto">
@@ -966,6 +1053,16 @@ export default function GroupDashboard() {
               </h3>
             </div>
             
+            {/* 체크판 잠금 — 잠금 조에서만 노출. 안내 문구 없이 버튼만 둔다(운영자 지시).
+                인증 전엔 체크박스가 disabled 상태다. */}
+            {checkLock && !leaderPin && (
+              <div className="mb-4 flex justify-end">
+                <button onClick={handleUnlockCheckboard} className="bg-[#E67E22] hover:bg-[#D35400] text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">
+                  🔒 조장 인증
+                </button>
+              </div>
+            )}
+
             <div className="flex gap-2 mb-6">
               <input type="text" value={memberInput} onChange={(e) => setMemberInput(e.target.value)} placeholder="조원 이름을 쉼표로 구분하여 입력 (예: 최경미, 이지민, 홍길동)" className="flex-1 bg-[#18181C] border border-[#27272A] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#E67E22] placeholder:text-[#3F3F46]" />
               <button onClick={handleRegisterMembers} className="bg-[#E67E22] hover:bg-[#D35400] text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-[#E67E22]/10">명단 저장</button>
@@ -1047,7 +1144,13 @@ export default function GroupDashboard() {
                           const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
                           return (
                             <td key={i} className={'py-3 px-2' + (isWeekEnd ? ' border-r border-[#33333A]' : '')}>
-                              <input type="checkbox" checked={isChecked} onChange={(e) => handleCheckboxToggle(member.name, dateStr, e.target.checked)} className="accent-[#E67E22] h-4 w-4 rounded border-[#27272A] bg-[#18181C] cursor-pointer" />
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                disabled={checkLock && !leaderPin}
+                                onChange={(e) => handleCheckboxToggle(member.name, dateStr, e.target.checked)}
+                                className={'accent-[#E67E22] h-4 w-4 rounded border-[#27272A] bg-[#18181C] ' + (checkLock && !leaderPin ? 'cursor-not-allowed opacity-40' : 'cursor-pointer')}
+                              />
                             </td>
                           );
                         })}
