@@ -1076,7 +1076,7 @@ export default function GroupDashboard() {
             (groupPercents['2026-08'] || []).length > 0 && (
             <div className="mt-4">
               <div className="text-[15px] font-bold text-[#D4D4D8]">《솔로몬의 재판》 | 페테르 파울 루벤스 · 1617년경</div>
-              <div className="text-[15px] text-[#71717A] mt-1">덴마크 국립미술관(SMK), 코펜하겐</div>
+              <div className="text-[15px] text-[#71717A] mt-1">덴마크 국립미술관, 코펜하겐</div>
             </div>
           )}
         </div>
