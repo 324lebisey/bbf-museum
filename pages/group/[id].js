@@ -1038,6 +1038,22 @@ export default function GroupDashboard() {
               <div className="text-[15px] text-[#71717A] mt-1">시스티나 경당 천장 프레스코, 바티칸</div>
             </div>
           )}
+
+          {/* 8월 명화 캡션 ① 우리 조 작품 탭 */}
+          {activeTab === '우리 조 작품' && currentMonth === '8월' && (
+            <div className="mt-3">
+              <div className="text-[15px] font-bold text-[#D4D4D8]">《솔로몬 왕을 방문한 시바 여왕》 | 에드워드 포인터 · 1890</div>
+              <div className="text-[15px] text-[#71717A] mt-1">뉴사우스웨일스 주립미술관, 시드니</div>
+            </div>
+          )}
+
+          {/* 8월 명화 캡션 ② 이달의 명화 전시관 상단 */}
+          {activeTab === '이달의 명화 전시관' && currentMonth === '8월' && (
+            <div className="mt-3">
+              <div className="text-[15px] font-bold text-[#D4D4D8]">《시바 여왕이 출항하는 항구》 | 클로드 로랭 · 1648</div>
+              <div className="text-[15px] text-[#71717A] mt-1">내셔널 갤러리, 런던</div>
+            </div>
+          )}
           {/* 그림이 확대되었을 때 수치 마진이 겹치지 않도록 간격 최적화 */}
           <div className={'text-[15px] text-[#52525B] font-bold tracking-widest uppercase transition-all ' + (isOctober ? 'mt-10' : 'mt-6')}>
             {activeTab === '우리 조 작품' ? selectedGroupToggle + '조 ' + currentMonth + ' 진도율' : activeTab + ' 진척도'}
@@ -1053,6 +1069,15 @@ export default function GroupDashboard() {
               currentGroupId={groupId}
               isAdmin={isAdmin}
             />
+          )}
+
+          {/* 8월 명화 캡션 ③ 모자이크 완성작 */}
+          {activeTab === '이달의 명화 전시관' && currentMonth === '8월' &&
+            (groupPercents['2026-08'] || []).length > 0 && (
+            <div className="mt-4">
+              <div className="text-[15px] font-bold text-[#D4D4D8]">《솔로몬의 재판》 | 페테르 파울 루벤스 · 1617년경</div>
+              <div className="text-[15px] text-[#71717A] mt-1">덴마크 국립미술관(SMK), 코펜하겐</div>
+            </div>
           )}
         </div>
 
