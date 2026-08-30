@@ -52,7 +52,10 @@ const ARTWORKS = {
   // public/august-group.jpg → 위키미디어 직링크로 이전 (Vercel Fast Data Transfer 절감).
   // 로컬 사본은 백업으로 public/에 남겨 둔다 — 참조하지 않으면 전송 비용이 0이다.
   '8월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/%27The_Visit_of_the_Queen_of_Sheba_to_King_Solomon%27%2C_oil_on_canvas_painting_by_Edward_Poynter%2C_1890%2C_Art_Gallery_of_New_South_Wales.jpg/1920px-%27The_Visit_of_the_Queen_of_Sheba_to_King_Solomon%27%2C_oil_on_canvas_painting_by_Edward_Poynter%2C_1890%2C_Art_Gallery_of_New_South_Wales.jpg',
-  '9월': '/september.jpg',  
+  // 로세티 《신부 (사랑하는 이)》 (아가). public/september.jpg → 위키미디어 직링크로 이전.
+  // ⚠️ 이 파일은 액자까지 함께 찍힌 스캔본이다. 액자 인셋(16.2/17.5/16.2/17.7)과 마스크 중심
+  //    49% 28%가 이 스캔본 기준이므로, 파일을 바꾸면 mask-lab.html로 전부 다시 잡아야 한다.
+  '9월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Dante_gabriel_rossetti%2C_l%27amata_%28la_sposa%29%2C_1865-66.jpg/1920px-Dante_gabriel_rossetti%2C_l%27amata_%28la_sposa%29%2C_1865-66.jpg',
   '10월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Transfiguration_Raphael.jpg/960px-Transfiguration_Raphael.jpg',
   '11월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg/3840px-The_Last_Supper_-_Leonardo_Da_Vinci_-_High_Resolution_32x16.jpg'
 };
@@ -65,6 +68,8 @@ const ARTWORKS_EXHIBIT = {
   // ⚠️ 커먼즈에 이 그림의 스캔본이 여러 개다(WGA판 등). 파일을 바꾸면 프레임이 달라져
   //    마스크 중심 44% 49%가 어긋나므로, 교체 시 mask-lab.html로 좌표를 다시 잡을 것.
   '8월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Claude_Lorrain_008.jpg/1280px-Claude_Lorrain_008.jpg',
+  // 아르테미시아 젠틸레스키 《아하수에로 앞의 에스더》 (에스더 5장)
+  '9월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Gentileschi%2C_Artemisia_-_Esther_before_Ahasuerus_-_c._1628%E2%80%931635.jpg/1280px-Gentileschi%2C_Artemisia_-_Esther_before_Ahasuerus_-_c._1628%E2%80%931635.jpg',
   // ⚠️ 파일명 주의: '/august.jpg'는 루벤스 《동방박사의 경배》다.
   //    원래 8월용으로 넣었으나 마 2 / 눅 2 구간이 실제로는 10월(10/22 마 1-5, 10/30 눅 1-6)이라
   //    10월 전시관으로 옮겼다. 파일 rename은 하지 않았으므로 이름('august') ≠ 역할(10월)이다.
@@ -77,6 +82,9 @@ const ARTWORKS_MOSAIC = {
   // 1400% 확대해 쓰므로 원본 해상도를 키워도 화질 이득이 없다 → 1920px 대신 1280px.
   // (URL의 숫자만 바꾸면 위키미디어가 어떤 폭이든 즉시 생성해 준다)
   '8월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Peter_Paul_Rubens_-_The_Judgement_of_Solomon_-_Google_Art_Project.jpg/1280px-Peter_Paul_Rubens_-_The_Judgement_of_Solomon_-_Google_Art_Project.jpg',
+  // 에드워드 힉스 《평화로운 왕국》 (사 11장). 모자이크는 타일당 1/14로 잘려 1400% 확대되므로
+  // 원본 해상도를 키워도 이득이 없다 → 1280px.
+  '9월': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Edward_Hicks_-_Peaceable_Kingdom.jpg/1280px-Edward_Hicks_-_Peaceable_Kingdom.jpg',
 };
 
 // 탭·월 → 실제로 걸 그림. 폴백은 항상 ARTWORKS.
@@ -850,10 +858,15 @@ export default function GroupDashboard() {
           break;
         }
         case '9월': {
-          // 좌하단→우상단 대각선으로 차오름. 초반 면적은 페이드 폭(+5)이 결정
-          const level = Math.pow(Number(percent) / 100, 1.8) * 100; // 차오르는 정도(지수 클수록 느림)
-          const band = level + 5;
-          maskValue = 'linear-gradient(315deg, rgba(0,0,0,1) ' + level + '%, rgba(0,0,0,0) ' + band + '%)';
+          // 자리마다 그림이 다르다.
+          //  · 전시관 = 젠틸레스키 《아하수에로 앞의 에스더》 → 에스더의 얼굴(88% 34%)에서 시작.
+          //  · 우리 조 = 로세티 《신부》 → 액자가 있어 이 함수가 아니라 getFramedBaseStyle이 처리한다.
+          //    (아래 값은 액자 처리를 끄면 쓰이는 폴백이다)
+          const isExhibit = activeTab === '이달의 명화 전시관';
+          const sCenter = isExhibit ? '88% 34%' : '49% 28%';
+          const sCore = Math.pow(Number(percent) / 100, isExhibit ? 1.5 : 1.6) * 100;
+          const sEdge = sCore + 4;                        // 페이드 폭
+          maskValue = 'radial-gradient(circle at ' + sCenter + ', rgba(0,0,0,1) ' + sCore + '%, rgba(0,0,0,0) ' + sEdge + '%)';
           break;
         }
         case '10월': {
@@ -900,6 +913,44 @@ export default function GroupDashboard() {
   // 어느 하나라도 미완이면 마스크에 0을 넘겨 컬러 레이어를 완전히 숨긴다(어두운 원본만 보임).
   const artworkSrc = getArtwork(activeTab, currentMonth);
   const revealReady = progressReady && loadedSrc === artworkSrc;
+
+  // ── 액자 모드 (9월 우리 조 · 로세티 《신부》) ────────────────────────
+  // 이 스캔본은 금박 액자까지 함께 찍혀 있다. 액자는 처음부터 컬러로 두고 그림만 어둡게
+  // 시작해야 '전시장에 아직 조명이 안 켜진 작품'처럼 보인다. 그래서 일반 달과 레이어가 뒤집힌다.
+  //   일반: 어두운 베이스 위에 컬러를 얹고, 컬러에 마스크를 건다.
+  //   액자: 컬러를 아래 깔고, 어두운 베이스를 위에 올려 안쪽만 남긴 뒤 역마스크로 구멍을 뚫는다.
+  // 값은 전부 mask-lab.html로 실측했다. 그림을 교체하면 전부 다시 잡아야 한다.
+  const FRAMED_ART = {
+    // clip-path inset 순서: 위 오른쪽 아래 왼쪽. 명판(THE BELOVED) 때문에 네 변이 다르다.
+    inset: 'inset(16.2% 17.5% 16.2% 17.7%)',
+    // 액자 띠(바깥 사각형 − 안쪽 사각형)만 남기는 도넛. 바깥 시계 / 안쪽 반시계 → 가운데가 뚫린다.
+    donut: 'polygon(0% 0%, 0% 100%, 17.7% 100%, 17.7% 16.2%, 82.5% 16.2%, 82.5% 83.8%, 17.7% 83.8%, 17.7% 100%, 100% 100%, 100% 0%)',
+    zoom: 'scale(1.02)',   // 액자 바깥 벽면을 살짝 잘라낸다
+    center: '49% 28%',     // 신부의 얼굴
+    exp: 1.6,              // 성장 지수. 키울수록 초반이 느리다
+    fade: 4,               // 페이드 폭
+    // 그라디언트 100%는 '요소 상자'의 먼 모서리다. 액자를 잘라내면 그림은 그보다 안쪽에서
+    // 끝나므로 73.8을 곱해야 진도율 100%가 그림 끝과 정확히 맞는다. (100으로 두면 75%에서 포화)
+    reach: 73.8,
+    dim: 0.52,             // 액자 초기 어둠. 진도율 100%에서 0이 된다
+  };
+  const isFramedArtwork = activeTab === '우리 조 작품' && currentMonth === '9월';
+  const framedPercent = revealReady ? Number(progressPercent) : 0;
+
+  // 액자 모드에서 '어두운 베이스'에 거는 역마스크 — 가운데가 뚫리고 바깥이 막힌다
+  const getFramedBaseStyle = (percent) => {
+    const p = Number(percent);
+    const box = {
+      transform: FRAMED_ART.zoom,
+      clipPath: FRAMED_ART.inset,
+      WebkitClipPath: FRAMED_ART.inset,
+    };
+    if (p === 0) return { ...box, WebkitMaskImage: 'none', maskImage: 'none' };
+    const aCore = Math.pow(p / 100, FRAMED_ART.exp) * FRAMED_ART.reach;
+    const aEdge = aCore + FRAMED_ART.fade;
+    const m = 'radial-gradient(circle at ' + FRAMED_ART.center + ', rgba(0,0,0,0) ' + aCore + '%, rgba(0,0,0,1) ' + aEdge + '%)';
+    return { ...box, WebkitMaskImage: m, maskImage: m };
+  };
 
   const isOctober = activeTab === '우리 조 작품' && currentMonth === '10월';
   const isLargeMonth = activeTab !== '150일 대장정' && !isOctober;
@@ -1016,18 +1067,34 @@ export default function GroupDashboard() {
               animation: 'paintingGlowPulse 2.4s ease-in-out infinite',
             } : undefined}
           >  
+            {/* 액자 모드에서는 이 어두운 베이스가 컬러 '위'로 올라가고(z-[3]) 마스크도 여기 걸린다 */}
             <img 
               src={artworkSrc} 
               alt="Museum Base"
-              className="w-full h-auto max-h-[80vh] object-contain filter grayscale brightness-[15%] block transition-all duration-300"
+              style={isFramedArtwork ? getFramedBaseStyle(framedPercent) : undefined}
+              className={'w-full h-auto max-h-[80vh] object-contain filter grayscale brightness-[15%] block transition-all duration-300' + (isFramedArtwork ? ' relative z-[3]' : '')}
             />
             
             <img 
               src={artworkSrc} 
               alt="Museum Color"
-              style={getMaskStyle(revealReady ? progressPercent : 0)}
-              className="absolute inset-0 w-full h-full object-contain filter brightness(115%) contrast(105%) block transition-all duration-300"
+              style={isFramedArtwork ? { transform: FRAMED_ART.zoom, opacity: 1 } : getMaskStyle(revealReady ? progressPercent : 0)}
+              className={'absolute inset-0 w-full h-full object-contain filter brightness(115%) contrast(105%) block transition-all duration-300' + (isFramedArtwork ? ' z-[2]' : '')}
             />
+
+            {/* 액자 어둠 — 액자 띠에만 검은 층을 덮고 진도율에 따라 걷힌다. 항상 맨 위(z-[4]) */}
+            {isFramedArtwork && (
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 z-[4] bg-black pointer-events-none transition-all duration-300"
+                style={{
+                  transform: FRAMED_ART.zoom,
+                  clipPath: FRAMED_ART.donut,
+                  WebkitClipPath: FRAMED_ART.donut,
+                  opacity: FRAMED_ART.dim * (1 - framedPercent / 100),
+                }}
+              />
+            )}
 
           </div>
           {/* 7월 명화 캡션 — 미켈란젤로 《아담의 창조》.
