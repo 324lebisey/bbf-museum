@@ -152,7 +152,7 @@ const MONTH_ORDER = ['7월', '8월', '9월', '10월', '11월'];
 //       (2) 안 쓰는 명화 프리로드 제거 (Vercel 전송량)
 //       (3) 텅 빈 달을 보고 "기록이 사라졌다"는 문의 차단
 // ⚠️ 달을 열 때는 pages/api/tongdok.js의 OPEN_UNTIL_MONTH도 반드시 같이 수정 (두 파일에 중복 선언).
-const OPEN_UNTIL_MONTH = '8월';
+const OPEN_UNTIL_MONTH = '9월';
 const _openCut = MONTH_ORDER.indexOf(OPEN_UNTIL_MONTH);
 const OPEN_MONTHS = _openCut < 0 ? MONTH_ORDER : MONTH_ORDER.slice(0, _openCut + 1);
 
