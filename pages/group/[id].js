@@ -860,15 +860,10 @@ export default function GroupDashboard() {
           break;
         }
         case '9월': {
-          // 자리마다 그림이 달라 리빌 시작점도 다르다. 좌표는 mask-lab.html로 잡은 값이므로 그대로 유지.
-          //  · 전시관 = 젠틸레스키 《아하수에로 앞의 에스더》 → 왼쪽(20% 55%)에서 시작, 페이드 +5.
-          //  · 우리 조 = 로세티 《사랑하는 자》 → 신부(50% 44%)에서 시작, 페이드 +4.
-          //  둘 다 성장 곡선은 선형(core = percent), peak 램프 없음.
-          const isExhibit = activeTab === '이달의 명화 전시관';
-          const sCenter = isExhibit ? '20% 55%' : '50% 44%';
-          const sCore = Number(percent);
-          const sEdge = sCore + (isExhibit ? 5 : 4);
-          maskValue = 'radial-gradient(circle at ' + sCenter + ', rgba(0,0,0,1) ' + sCore + '%, rgba(0,0,0,0) ' + sEdge + '%)';
+          // 좌하단→우상단 대각선으로 차오름. 초반 면적은 페이드 폭(+5)이 결정
+          const level = Math.pow(Number(percent) / 100, 1.8) * 100; // 차오르는 정도(지수 클수록 느림)
+          const band = level + 5;
+          maskValue = 'linear-gradient(315deg, rgba(0,0,0,1) ' + level + '%, rgba(0,0,0,0) ' + band + '%)';
           break;
         }
         case '10월': {
