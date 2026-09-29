@@ -1128,7 +1128,7 @@ export default function GroupDashboard() {
           {/* 9월 명화 캡션 ① 우리 조 작품 탭 */}
           {activeTab === '우리 조 작품' && currentMonth === '9월' && (
             <div className="mt-3">
-              <div className="text-[15px] font-bold text-[#D4D4D8]">《신부》 | 단테 가브리엘 로세티 · 1865–66</div>
+              <div className="text-[15px] font-bold text-[#D4D4D8]">《사랑하는 자(신부)》 | 단테 가브리엘 로세티 · 1865–66</div>
               <div className="text-[15px] text-[#71717A] mt-1">테이트 브리튼, 런던</div>
             </div>
           )}
