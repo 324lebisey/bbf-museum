@@ -150,23 +150,36 @@ const READING_PLAN = {
 const MONTH_ORDER = ['7월', '8월', '9월', '10월', '11월'];
 
 // ── 월 개방 제어 ──────────────────────────────────────
-// 아직 오지 않은 달은 탭에서 감춘다. TOTAL_DAYS_BY_MONTH는 일차 계산의 원천이므로 손대지 않는다.
+// 오늘(KST) 기준으로 "이미 시작된 달"만 탭에 연다. 수동 설정 없음 — 10월 1일이 되면 10월이 자동으로 열린다.
+// TOTAL_DAYS_BY_MONTH는 일차 계산의 원천이므로 손대지 않는다.
 // 목적: (1) 빈 달의 allGroups 풀스캔 차단 — 월별 캐시 키라 클릭 1회 = 전체 스캔 1회
 //       (2) 안 쓰는 명화 프리로드 제거 (Vercel 전송량)
 //       (3) 텅 빈 달을 보고 "기록이 사라졌다"는 문의 차단
-// ⚠️ 달을 열 때는 pages/api/tongdok.js의 OPEN_UNTIL_MONTH도 반드시 같이 수정 (두 파일에 중복 선언).
-const OPEN_UNTIL_MONTH = '9월';
-const _openCut = MONTH_ORDER.indexOf(OPEN_UNTIL_MONTH);
-const OPEN_MONTHS = _openCut < 0 ? MONTH_ORDER : MONTH_ORDER.slice(0, _openCut + 1);
+// ⚠️ 오늘 날짜에 의존하므로 모듈 상수가 아니라 mount effect에서 계산해 state에 넣는다
+//    (모듈 상수로 두면 빌드 시점 값이 프리렌더 HTML에 구워진다).
+// ※ 달력 날짜(오늘)로 '열린 달'을 정하는 것일 뿐, check_date(통독일 일차 인덱스)와는 무관하다.
+const getKstNow = () => {
+  const k = new Date(Date.now() + 9 * 60 * 60 * 1000); // UTC 필드로 읽으면 KST
+  return { year: k.getUTCFullYear(), month: k.getUTCMonth() + 1 };
+};
+
+const getOpenMonths = () => {
+  const { year, month } = getKstNow();
+  if (year > 2026) return MONTH_ORDER;                 // 프로그램 종료 후: 전체
+  if (year < 2026 || month < 7) return [MONTH_ORDER[0]]; // 시작 전: 첫 달만
+  return MONTH_ORDER.filter(l => Number(l.replace('월', '')) <= month);
+};
 
 // 진입 시 기본으로 열릴 달 = 오늘이 속한 달.
-// 반드시 OPEN_MONTHS 안에서만 고른다 — 개방되지 않은 달을 초기값으로 잡으면
+// 반드시 openMonths 안에서만 고른다 — 개방되지 않은 달을 초기값으로 잡으면
 // 월 버튼이 렌더되지 않아 아무것도 선택 안 된 상태가 되고, 빈 달의 집계 쿼리가 나간다.
-// 7월 이전(준비 기간)이면 첫 달, 프로그램 종료 후·미개방 달이면 개방된 마지막 달로 클램프.
-const getDefaultMonth = () => {
-  const label = (new Date().getMonth() + 1) + '월';
-  if (OPEN_MONTHS.includes(label)) return label;
-  return (new Date().getMonth() + 1) < 7 ? OPEN_MONTHS[0] : OPEN_MONTHS[OPEN_MONTHS.length - 1];
+// 시작 전이면 첫 달, 프로그램 종료 후면 마지막 달로 클램프.
+const getDefaultMonth = (openMonths) => {
+  const { year, month } = getKstNow();
+  const label = month + '월';
+  if (year === 2026 && openMonths.includes(label)) return label;
+  const beforeStart = year < 2026 || (year === 2026 && month < 7);
+  return beforeStart ? openMonths[0] : openMonths[openMonths.length - 1];
 };
 
 // 해당 월의 통독일 실제 날짜 배열 — [i]가 (i+1)일차의 달력 날짜 (주일 제외)
@@ -393,6 +406,7 @@ export default function GroupDashboard() {
 
   const [activeTab, setActiveTab] = useState('우리 조 작품');
   const [currentMonth, setCurrentMonth] = useState('7월');
+  const [openMonths, setOpenMonths] = useState([MONTH_ORDER[0]]); // mount 후 오늘 날짜로 확정 (§4.8)
   const [selectedGroupToggle, setSelectedGroupToggle] = useState('');
   
   const [memberInput, setMemberInput] = useState('');
@@ -444,7 +458,9 @@ export default function GroupDashboard() {
   // — 초기값으로 넣으면 빌드 시점 달이 HTML에 구워져 hydration 불일치가 난다.
   // 이 시점엔 아직 router.query가 비어 groupId가 없으므로 불필요한 7월 집계 요청도 나가지 않는다.
   useEffect(() => {
-    setCurrentMonth(getDefaultMonth());
+    const open = getOpenMonths();
+    setOpenMonths(open);
+    setCurrentMonth(getDefaultMonth(open));
   }, []);
 
   // 조 번호가 정해지면 우리 조 데이터 로드
@@ -1036,7 +1052,7 @@ export default function GroupDashboard() {
 
         {activeTab !== '150일 대장정' && (
           <div className="flex justify-center gap-1.5 mb-8 bg-[#121215]/50 p-1 rounded-lg border border-[#1F1F23]/60 max-w-xs mx-auto">
-            {OPEN_MONTHS.map(m => (
+            {openMonths.map(m => (
               <button
                 key={m}
                 onClick={() => setCurrentMonth(m)}
