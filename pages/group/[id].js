@@ -1086,12 +1086,13 @@ export default function GroupDashboard() {
               animation: 'paintingGlowPulse 2.4s ease-in-out infinite',
             } : undefined}
           >  
-            {/* 액자 모드에서는 이 어두운 베이스가 컬러 '위'로 올라가고(z-[3]) 마스크도 여기 걸린다 */}
+            {/* 어두운 베이스 = 완전한 검정(brightness-0). 모자이크 0% 타일(#050505)과 같은 톤 — 리빌 전엔 그림이 전혀 비치지 않는다.
+                액자 모드에서는 이 베이스가 컬러 '위'로 올라가고(z-[3]) 마스크도 여기 걸린다 */}
             <img 
               src={artworkSrc} 
               alt="Museum Base"
               style={isFramedArtwork ? getFramedBaseStyle(framedPercent) : undefined}
-              className={'w-full h-auto max-h-[80vh] object-contain filter grayscale brightness-[15%] block transition-all duration-300' + (isFramedArtwork ? ' relative z-[3]' : '')}
+              className={'w-full h-auto max-h-[80vh] object-contain filter brightness-0 block transition-all duration-300' + (isFramedArtwork ? ' relative z-[3]' : '')}
             />
             
             <img 
