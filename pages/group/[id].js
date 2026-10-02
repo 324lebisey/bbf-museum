@@ -1094,7 +1094,7 @@ export default function GroupDashboard() {
               src={artworkSrc} 
               alt="Museum Base"
               style={isFramedArtwork ? getFramedBaseStyle(framedPercent) : undefined}
-              className={'w-full h-auto max-h-[80vh] object-contain filter grayscale brightness-[15%] block transition-all duration-300' + (isFramedArtwork ? ' relative z-[3]' : '')}
+              className={'w-full h-auto max-h-[80vh] object-contain filter brightness-0 block transition-all duration-300' + (isFramedArtwork ? ' relative z-[3]' : '')}
             />
             
             {/* 컬러 레이어는 '그림 디코딩 + 진도 숫자'가 둘 다 준비된 뒤에만 DOM에 존재한다.
