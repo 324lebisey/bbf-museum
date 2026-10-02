@@ -553,9 +553,11 @@ export default function GroupDashboard() {
     let cancelled = false;
     const img = new Image();
     const done = () => { if (!cancelled) setLoadedSrc(src); };
-    img.onload = done;
+    const viaOnload = () => { img.onload = done; if (img.complete) done(); };
     img.src = src;
-    if (img.complete) done();
+    // decode()까지 기다려야 '로드됨'과 '화면에 그릴 수 있음' 사이의 한 프레임 틈이 없다
+    if (typeof img.decode === 'function') img.decode().then(done, viaOnload);
+    else viaOnload();
     return () => { cancelled = true; };
   }, [activeTab, currentMonth]);
 
@@ -1086,21 +1088,28 @@ export default function GroupDashboard() {
               animation: 'paintingGlowPulse 2.4s ease-in-out infinite',
             } : undefined}
           >  
-            {/* 어두운 베이스 = 완전한 검정(brightness-0). 모자이크 0% 타일(#050505)과 같은 톤 — 리빌 전엔 그림이 전혀 비치지 않는다.
-                액자 모드에서는 이 베이스가 컬러 '위'로 올라가고(z-[3]) 마스크도 여기 걸린다 */}
+            {/* 액자 모드에서는 이 어두운 베이스가 컬러 '위'로 올라가고(z-[3]) 마스크도 여기 걸린다 */}
             <img 
+              key={'base-' + artworkSrc}
               src={artworkSrc} 
               alt="Museum Base"
               style={isFramedArtwork ? getFramedBaseStyle(framedPercent) : undefined}
-              className={'w-full h-auto max-h-[80vh] object-contain filter brightness-0 block transition-all duration-300' + (isFramedArtwork ? ' relative z-[3]' : '')}
+              className={'w-full h-auto max-h-[80vh] object-contain filter grayscale brightness-[15%] block transition-all duration-300' + (isFramedArtwork ? ' relative z-[3]' : '')}
             />
             
-            <img 
-              src={artworkSrc} 
-              alt="Museum Color"
-              style={isFramedArtwork ? { transform: FRAMED_ART.zoom, opacity: 1 } : getMaskStyle(revealReady ? progressPercent : 0)}
-              className={'absolute inset-0 w-full h-full object-contain filter brightness(115%) contrast(105%) block transition-all duration-300' + (isFramedArtwork ? ' z-[2]' : '')}
-            />
+            {/* 컬러 레이어는 '그림 디코딩 + 진도 숫자'가 둘 다 준비된 뒤에만 DOM에 존재한다.
+                준비 전엔 아예 렌더하지 않고(어두운 베이스만 보임), key로 탭·월마다 새로 마운트하며,
+                transition을 걸지 않는다 → 전환 중 컬러 원본이 보일 수 있는 경로가 구조적으로 없다.
+                액자 모드는 숫자와 무관하므로 그림 로딩만 기다린다. */}
+            {(isFramedArtwork ? loadedSrc === artworkSrc : revealReady) && (
+              <img 
+                key={'color-' + artworkSrc}
+                src={artworkSrc} 
+                alt="Museum Color"
+                style={isFramedArtwork ? { transform: FRAMED_ART.zoom, opacity: 1 } : getMaskStyle(progressPercent)}
+                className={'absolute inset-0 w-full h-full object-contain filter brightness(115%) contrast(105%) block' + (isFramedArtwork ? ' z-[2]' : '')}
+              />
+            )}
 
             {/* 액자 어둠 — 액자 띠에만 검은 층을 덮고 진도율에 따라 걷힌다. 항상 맨 위(z-[4]) */}
             {isFramedArtwork && (
