@@ -4,7 +4,28 @@ import { useRouter } from 'next/router';
 const TOTAL_DAYS_BY_MONTH = {
   '7월': 27, '8월': 26, '9월': 26, '10월': 27, '11월': 23
 };
-const TOTAL_150_DAYS = 131; 
+const TOTAL_150_DAYS = Object.values(TOTAL_DAYS_BY_MONTH).reduce((sum, days) => sum + days, 0); // 129 통독일
+
+// 최종 통독률: check_date는 달력 날짜가 아닌 월별 통독 일차다.
+// 유효한 129일의 체크만 현재 명단 기준으로 중복 없이 집계한다.
+function getFinalReadingCounts(members, logs) {
+  const datesByName = new Map(members.map(m => [m.name, new Set()]));
+  for (const l of logs) {
+    const dates = datesByName.get(l.member_name);
+    if (!dates || !/^2026-(07|08|09|10|11)-\d{2}$/.test(l.check_date)) continue;
+    const [, month, day] = l.check_date.split('-');
+    if (Number(day) < 1 || Number(day) > TOTAL_DAYS_BY_MONTH[Number(month) + '월']) continue;
+    dates.add(l.check_date);
+  }
+  return new Map(Array.from(datesByName, ([name, dates]) => [name, dates.size]));
+}
+
+function getFinalPercent(checked, goal) {
+  if (goal <= 0) return 0;
+  if (checked === goal) return 100;
+  return Math.min(Number((checked / goal * 100).toFixed(1)), 99.9);
+}
+
 const LIT_THRESHOLD = 90; // 90~99%는 은색(#D4D4D8)으로 표시. 100%만 금색(#FFD700) + 글로우 + ✓. 미만은 기존 회색
 // Neon 무료 티어 대응: window focus 재조회 최소 간격. 폴링 금지 원칙(정본 §6)의 짝.
 // 2,000명 규모에서 alt-tab마다 2쿼리가 나가면 DB가 사실상 상시 깨어 CU-h가 월말 전 소진된다.
@@ -255,7 +276,7 @@ const MOSAIC_ROW_COUNTS = buildMosaicRowCounts(94, MOSAIC_ROWS);
 
 // 집계 데이터는 부모(GroupDashboard)가 받아 prop으로 내려준다.
 // 타 조 갤러리 순회와 같은 데이터를 쓰므로, 여기서 따로 fetch하면 같은 달을 두 번 받게 된다.
-function GroupMosaic({ groups, paintingSrc, currentGroupId, isAdmin }) {
+function GroupMosaic({ groups, paintingSrc, currentGroupId, isAdmin, showFinalPercent }) {
   const mosaicGroups = groups || [];
   const [hoverGroup, setHoverGroup] = useState(null);
   const [tappedGroupId, setTappedGroupId] = useState(null); // 모바일: 1차 탭한 타일
@@ -309,7 +330,8 @@ function GroupMosaic({ groups, paintingSrc, currentGroupId, isAdmin }) {
     return { colCount, items };
   });
 
-  const displayGroup = hoverGroup;
+  // 월 전환 후 이전 월에 호버했던 데이터가 남아도 현재 집계만 표시한다.
+  const displayGroup = hoverGroup && mosaicGroups.find(g => g.groupId === hoverGroup.groupId);
 
   return (
     <div className="mt-12">
@@ -368,14 +390,28 @@ function GroupMosaic({ groups, paintingSrc, currentGroupId, isAdmin }) {
         )}
       </div>
 
-      <div className="h-8 text-center mt-2">
-        {displayGroup && (
+      <div className={(showFinalPercent ? 'min-h-[76px]' : 'h-8') + ' text-center mt-2'}>
+        {displayGroup && (showFinalPercent ? (
+          <div>
+            <div className="text-[17px] font-bold text-[#D4D4D8]">{displayGroup.groupId}조</div>
+            <div className="flex justify-center gap-8 mt-1">
+              <div>
+                <div className="text-xs text-[#71717A]">11월 진도율</div>
+                <div className="text-[22px] font-black text-[#E67E22]">{displayGroup.percent}%</div>
+              </div>
+              <div>
+                <div className="text-xs text-[#D4D4D8]">최종 통독률</div>
+                <div className="text-[22px] font-black text-[#FFB366]">{displayGroup.finalPercent == null ? '···' : displayGroup.finalPercent.toFixed(1) + '%'}</div>
+              </div>
+            </div>
+          </div>
+        ) : (
           <span>
             <span style={{ fontSize: '17px' }} className="font-bold text-[#D4D4D8]">{displayGroup.groupId}조</span>
             <span style={{ fontSize: '17px' }} className="text-[#52525B]"> · </span>
             <span style={{ fontSize: '22px' }} className="font-black text-[#E67E22]">{displayGroup.percent}%</span>
           </span>
-        )}
+        ))}
       </div>
       {isAdmin && tappedGroupId && (
         <div className="text-center text-[15px] text-[#52525B] mt-1">
@@ -403,6 +439,7 @@ export default function GroupDashboard() {
   };
   const NAME_COL_WIDTH = 88; // 한글 4글자 + 좌우 패딩에 딱 맞는 폭
   const DAY_COL_WIDTH = 48;
+  const FINAL_COL_WIDTH = 76;
 
   const [activeTab, setActiveTab] = useState('우리 조 작품');
   const [currentMonth, setCurrentMonth] = useState('7월');
@@ -412,6 +449,7 @@ export default function GroupDashboard() {
   const [memberInput, setMemberInput] = useState('');
   const [members, setMembers] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [loadedGroupId, setLoadedGroupId] = useState(null);
   const [allGroupsLogsCount, setAllGroupsLogsCount] = useState(0);
   const [totalPeople, setTotalPeople] = useState(0); // 현재 등록 인원(분모). 이탈하면 자동으로 줄어듦
   // 전 조 진행률 { '2026-08': [{groupId, percent}] }. 모자이크와 타 조 갤러리 순회가 공용으로 쓴다.
@@ -569,6 +607,7 @@ export default function GroupDashboard() {
       // 명단 순서를 고정하고, 상태를 업데이트합니다.
       setMembers([...result.members]); 
       setLogs(result.logs || []);
+      setLoadedGroupId(String(targetGroupId));
       // 우리 조 데이터일 때만, 입력창이 비어 있으면 현재 명단으로 채워줌
       // → PIN 등록·조원 한 명 추가 등에 전체 재입력이 필요 없어짐.
       //   (타 조 갤러리 순회 데이터로는 절대 채우지 않음 / 입력 중인 내용은 덮어쓰지 않음)
@@ -752,6 +791,14 @@ export default function GroupDashboard() {
   const rosterCount = members.length;
   const groupTargetGoal = rosterCount * targetDays;
 
+  // 11월 화면에서만 최종 통독률 표시. 기존 월별 진도율 계산에는 영향 없음.
+  const showFinalPercent = currentMonth === '11월';
+  const showGroupFinal = showFinalPercent && activeTab === '우리 조 작품';
+  const finalReadingCounts = showGroupFinal ? getFinalReadingCounts(members, logs) : new Map();
+  const groupFinalChecked = Array.from(finalReadingCounts.values()).reduce((sum, count) => sum + count, 0);
+  const ownFinalPercent = getFinalPercent(groupFinalChecked, rosterCount * TOTAL_150_DAYS);
+  const finalTableWidth = NAME_COL_WIDTH + (showFinalPercent ? FINAL_COL_WIDTH : 0) + targetDays * DAY_COL_WIDTH;
+
   const groupCurrentChecked = logs.filter(
     l => rosterNames.has(l.member_name) && l.check_date.includes('-' + monthString + '-')
   ).length;
@@ -812,6 +859,9 @@ export default function GroupDashboard() {
 
   const isOwnGroupView = String(selectedGroupToggle) === String(groupId);
   const monthParamForPercents = '2026-' + monthString;
+  const selectedFinalPercent = isOwnGroupView
+    ? (loadedGroupId === String(groupId) ? ownFinalPercent : null)
+    : (groupPercents[monthParamForPercents] || []).find(g => String(g.groupId) === String(selectedGroupToggle))?.finalPercent;
 
   // ── 리빌 동기화 ────────────────────────────────────────
   // 지금 화면의 탭·월에 해당하는 숫자가 실제로 도착했는지 판정한다.
@@ -1166,13 +1216,56 @@ export default function GroupDashboard() {
               <div className="text-[15px] text-[#71717A] mt-1">메트로폴리탄 미술관, 뉴욕</div>
             </div>
           )}
+
+          {/* 10월 명화 캡션 ① 우리 조 작품 탭 */}
+          {activeTab === '우리 조 작품' && currentMonth === '10월' && (
+            <div className="mt-10">
+              <div className="text-[15px] font-bold text-[#D4D4D8]">《그리스도의 변용》 | 라파엘로 · 1516–20</div>
+              <div className="text-[15px] text-[#71717A] mt-1">바티칸 미술관, 바티칸</div>
+            </div>
+          )}
+
+          {/* 10월 명화 캡션 ② 이달의 명화 전시관 상단 */}
+          {activeTab === '이달의 명화 전시관' && currentMonth === '10월' && (
+            <div className="mt-3">
+              <div className="text-[15px] font-bold text-[#D4D4D8]">《동방박사의 경배》 | 페테르 파울 루벤스 · 1609, 1628–29년 개작</div>
+              <div className="text-[15px] text-[#71717A] mt-1">프라도 미술관, 마드리드</div>
+            </div>
+          )}
+
+          {/* 11월 명화 캡션 ① 우리 조 작품 탭 */}
+          {activeTab === '우리 조 작품' && currentMonth === '11월' && (
+            <div className="mt-3">
+              <div className="text-[15px] font-bold text-[#D4D4D8]">《최후의 만찬》 | 레오나르도 다 빈치 · 1495–98</div>
+              <div className="text-[15px] text-[#71717A] mt-1">산타 마리아 델레 그라치에 수도원, 밀라노</div>
+            </div>
+          )}
           {/* 그림이 확대되었을 때 수치 마진이 겹치지 않도록 간격 최적화 */}
-          <div className={'text-[15px] text-[#52525B] font-bold tracking-widest uppercase transition-all ' + (isOctober ? 'mt-10' : 'mt-6')}>
-            {activeTab === '우리 조 작품' ? selectedGroupToggle + '조 ' + currentMonth + ' 진도율' : activeTab + ' 진척도'}
-          </div>
-          <div className="text-5xl font-black text-[#E67E22] mt-1 tracking-tighter">
-            {progressReady ? progressPercent + '%' : '\u00B7\u00B7\u00B7'}
-          </div>
+          {showGroupFinal ? (
+            <div className="grid grid-cols-2 gap-2 md:gap-6 mt-6">
+              <div>
+                <div className="text-[13px] md:text-[15px] text-[#52525B] font-bold">{selectedGroupToggle}조 11월 진도율</div>
+                <div className="text-3xl md:text-5xl font-black text-[#E67E22] mt-1 tracking-tighter">
+                  {progressReady ? progressPercent + '%' : '···'}
+                </div>
+              </div>
+              <div>
+                <div className="text-[13px] md:text-[15px] text-[#D4D4D8] font-bold">150일 최종 통독률</div>
+                <div className="text-3xl md:text-5xl font-black text-[#FFB366] mt-1 tracking-tighter">
+                  {selectedFinalPercent == null ? '···' : selectedFinalPercent.toFixed(1) + '%'}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className={'text-[15px] text-[#52525B] font-bold tracking-widest uppercase transition-all ' + (isOctober ? 'mt-10' : 'mt-6')}>
+                {activeTab === '우리 조 작품' ? selectedGroupToggle + '조 ' + currentMonth + ' 진도율' : activeTab + ' 진척도'}
+              </div>
+              <div className="text-5xl font-black text-[#E67E22] mt-1 tracking-tighter">
+                {progressReady ? progressPercent + '%' : '\u00B7\u00B7\u00B7'}
+              </div>
+            </>
+          )}
 
           {activeTab === '이달의 명화 전시관' && (
             <GroupMosaic
@@ -1180,6 +1273,7 @@ export default function GroupDashboard() {
               paintingSrc={getMosaicArtwork(currentMonth)}
               currentGroupId={groupId}
               isAdmin={isAdmin}
+              showFinalPercent={showFinalPercent}
             />
           )}
 
@@ -1198,6 +1292,15 @@ export default function GroupDashboard() {
             <div className="mt-4">
               <div className="text-[15px] font-bold text-[#D4D4D8]">《평화로운 왕국》 | 에드워드 힉스 · 1834년경</div>
               <div className="text-[15px] text-[#71717A] mt-1">국립미술관, 워싱턴 D.C.</div>
+            </div>
+          )}
+
+          {/* 10월 명화 캡션 ③ 모자이크 완성작 */}
+          {activeTab === '이달의 명화 전시관' && currentMonth === '10월' &&
+            (groupPercents['2026-10'] || []).length > 0 && (
+            <div className="mt-4">
+              <div className="text-[15px] font-bold text-[#D4D4D8]">《선한 사마리아인 (들라크루아 모작)》 | 빈센트 반 고흐 · 1890</div>
+              <div className="text-[15px] text-[#71717A] mt-1">크뢸러-뮐러 미술관, 오테를로</div>
             </div>
           )}
         </div>
@@ -1226,14 +1329,20 @@ export default function GroupDashboard() {
               {/* 날짜 헤더 — 별도 div, sticky top-0으로 페이지(뷰포트) 스크롤 기준 고정.
                   ※ 부모에 overflow-hidden/auto가 있으면 sticky가 그 박스에 갇혀 무효화되므로 절대 넣지 말 것. */}
               <div ref={headerScrollRef} className="overflow-x-hidden sticky top-0 z-20 bg-[#141416] rounded-t-xl">
-                <table style={{ tableLayout: 'fixed', width: NAME_COL_WIDTH + targetDays * DAY_COL_WIDTH }} className="text-sm text-center">
+                <table style={{ tableLayout: 'fixed', width: finalTableWidth }} className="text-sm text-center">
                   <colgroup>
                     <col style={{ width: NAME_COL_WIDTH }} />
+                    {showFinalPercent && <col style={{ width: FINAL_COL_WIDTH }} />}
                     {Array.from({ length: targetDays }).map((_, i) => <col key={i} style={{ width: DAY_COL_WIDTH }} />)}
                   </colgroup>
                   <thead>
                     <tr className="bg-[#141416] text-[#52525B] border-b border-[#1F1F23] text-sm font-bold">
                       <th className="py-3 px-4 text-left sticky left-0 bg-[#141416] text-[#A1A1AA] z-30 border-r border-[#1F1F23] whitespace-nowrap">이름</th>
+                      {showFinalPercent && (
+                        <th style={{ left: NAME_COL_WIDTH }} className="py-2 px-1 sticky bg-[#141416] text-[#E67E22] z-30 border-r border-[#1F1F23] text-xs leading-tight whitespace-nowrap">
+                          최종<br />통독률
+                        </th>
+                      )}
                       {Array.from({ length: targetDays }).map((_, i) => {
                         const isWeekEnd = readingDates[i] && readingDates[i].getDay() === 6;
                         const displayDate = readingDates[i] ? readingDates[i].getDate() : i + 1;
@@ -1267,9 +1376,10 @@ export default function GroupDashboard() {
 
               {/* 표 본문 — 가로 스크롤은 여기서만, 세로는 페이지 스크롤 그대로 */}
               <div ref={bodyScrollRef} onScroll={handleBodyScroll} className="overflow-x-auto rounded-b-xl">
-                <table style={{ tableLayout: 'fixed', width: NAME_COL_WIDTH + targetDays * DAY_COL_WIDTH }} className="text-sm text-center">
+                <table style={{ tableLayout: 'fixed', width: finalTableWidth }} className="text-sm text-center">
                   <colgroup>
                     <col style={{ width: NAME_COL_WIDTH }} />
+                    {showFinalPercent && <col style={{ width: FINAL_COL_WIDTH }} />}
                     {Array.from({ length: targetDays }).map((_, i) => <col key={i} style={{ width: DAY_COL_WIDTH }} />)}
                   </colgroup>
                   <tbody className="divide-y divide-[#1F1F23]">
@@ -1286,6 +1396,17 @@ export default function GroupDashboard() {
                             */}
                           </span>
                         </td>
+                        {showFinalPercent && (() => {
+                          const checked = finalReadingCounts.get(member.name) || 0;
+                          const pct = getFinalPercent(checked, TOTAL_150_DAYS);
+                          const full = checked === TOTAL_150_DAYS;
+                          const color = full ? '#FFD700' : pct >= LIT_THRESHOLD ? '#D4D4D8' : '#71717A';
+                          return (
+                            <td style={{ left: NAME_COL_WIDTH, color, textShadow: full ? '0 0 6px rgba(255,215,0,0.9), 0 0 14px rgba(255,179,102,0.6)' : undefined }} className="py-3 px-1 sticky bg-[#121215] border-r border-[#1F1F23] z-10 whitespace-nowrap text-xs font-bold">
+                              {loadedGroupId !== String(groupId) ? '···' : full ? '100%✓' : pct.toFixed(1) + '%'}
+                            </td>
+                          );
+                        })()}
                         {Array.from({ length: targetDays }).map((_, i) => {
                           const dateStr = '2026-' + monthString + '-' + String(i + 1).padStart(2, '0');
                           const isChecked = logs.some(l => l.member_name === member.name && l.check_date === dateStr);
