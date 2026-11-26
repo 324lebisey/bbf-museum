@@ -2,6 +2,27 @@ import { neon } from '@neondatabase/serverless';
 
 // ── GroupDashboard.js와 동일한 로직 (일차 계산 + 비활성 판정) ──
 const TOTAL_DAYS_BY_MONTH = { '7월': 27, '8월': 26, '9월': 26, '10월': 27, '11월': 23 };
+const TOTAL_150_DAYS = Object.values(TOTAL_DAYS_BY_MONTH).reduce((sum, days) => sum + days, 0); // 129 통독일
+// 최종 통독률: check_date는 달력 날짜가 아닌 월별 통독 일차다.
+// 유효한 129일의 체크만 현재 명단 기준으로 중복 없이 집계한다.
+function getFinalReadingCounts(members, logs) {
+  const datesByName = new Map(members.map(m => [m.name, new Set()]));
+  for (const l of logs) {
+    const dates = datesByName.get(l.member_name);
+    if (!dates || !/^2026-(07|08|09|10|11)-\d{2}$/.test(l.check_date)) continue;
+    const [, month, day] = l.check_date.split('-');
+    if (Number(day) < 1 || Number(day) > TOTAL_DAYS_BY_MONTH[Number(month) + '월']) continue;
+    dates.add(l.check_date);
+  }
+  return new Map(Array.from(datesByName, ([name, dates]) => [name, dates.size]));
+}
+
+function getFinalPercent(checked, goal) {
+  if (goal <= 0) return 0;
+  if (checked === goal) return 100;
+  return Math.min(Number((checked / goal * 100).toFixed(1)), 99.9);
+}
+
 const MONTH_ORDER = ['7월', '8월', '9월', '10월', '11월'];
 const SPLIT_GROUPS = new Set([17, 22, 26]);
 const ALL_GROUP_IDS = (() => {
@@ -202,7 +223,14 @@ export default async function handler(req, res) {
           ? Math.min((groupCurrentChecked / groupTargetGoal) * 100, 100)
           : 0;
 
-        return { groupId: gid, percent: Number(percent.toFixed(1)) };
+        const row = { groupId: gid, percent: Number(percent.toFixed(1)) };
+        // 11월 집계에만 최종 통독률 추가. 기존에 읽은 전체 로그 재사용 → 추가 DB 쿼리 없음.
+        if (month === '2026-11') {
+          const counts = getFinalReadingCounts(groupMembers, groupLogs);
+          const checked = Array.from(counts.values()).reduce((sum, count) => sum + count, 0);
+          row.finalPercent = getFinalPercent(checked, groupMembers.length * TOTAL_150_DAYS);
+        }
+        return row;
       });
 
       const payload = { groups };
