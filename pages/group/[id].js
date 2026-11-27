@@ -1253,6 +1253,14 @@ export default function GroupDashboard() {
             )}
 
           </div>
+          {/* 150일 대장정 명화 캡션 — 밀레 《만종》 */}
+          {activeTab === '150일 대장정' && (
+            <div className="mt-3">
+              <div className="text-[15px] font-bold text-[#D4D4D8]">《만종》 | 장프랑수아 밀레 · 1857–59</div>
+              <div className="text-[15px] text-[#71717A] mt-1">오르세 미술관, 파리</div>
+            </div>
+          )}
+
           {/* 7월 명화 캡션 — 미켈란젤로 《아담의 창조》.
               ※ '150일 대장정' 탭은 currentMonth가 '7월'이어도 그림이 밀레 《만종》이므로 제외 */}
           {activeTab !== '150일 대장정' && currentMonth === '7월' && (
