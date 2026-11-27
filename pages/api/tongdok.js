@@ -2,6 +2,27 @@ import { neon } from '@neondatabase/serverless';
 
 // ── GroupDashboard.js와 동일한 로직 (일차 계산 + 비활성 판정) ──
 const TOTAL_DAYS_BY_MONTH = { '7월': 27, '8월': 26, '9월': 26, '10월': 27, '11월': 23 };
+const TOTAL_150_DAYS = Object.values(TOTAL_DAYS_BY_MONTH).reduce((sum, days) => sum + days, 0); // 129 통독일
+// 최종 통독률: check_date는 달력 날짜가 아닌 월별 통독 일차다.
+// 유효한 129일의 체크만 현재 명단 기준으로 중복 없이 집계한다.
+function getFinalReadingCounts(members, logs) {
+  const datesByName = new Map(members.map(m => [m.name, new Set()]));
+  for (const l of logs) {
+    const dates = datesByName.get(l.member_name);
+    if (!dates || !/^2026-(07|08|09|10|11)-\d{2}$/.test(l.check_date)) continue;
+    const [, month, day] = l.check_date.split('-');
+    if (Number(day) < 1 || Number(day) > TOTAL_DAYS_BY_MONTH[Number(month) + '월']) continue;
+    dates.add(l.check_date);
+  }
+  return new Map(Array.from(datesByName, ([name, dates]) => [name, dates.size]));
+}
+
+function getFinalPercent(checked, goal) {
+  if (goal <= 0) return 0;
+  if (checked === goal) return 100;
+  return Math.min(Number((checked / goal * 100).toFixed(1)), 99.9);
+}
+
 const MONTH_ORDER = ['7월', '8월', '9월', '10월', '11월'];
 const SPLIT_GROUPS = new Set([17, 22, 26]);
 const ALL_GROUP_IDS = (() => {
@@ -63,7 +84,7 @@ function buildRankings(rows) {
   }
   const rankings = {};
   for (const period of rankingPeriods) {
-    const days = period === '전체' ? 129 : TOTAL_DAYS_BY_MONTH[period];
+    const days = period === '전체' ? TOTAL_150_DAYS : TOTAL_DAYS_BY_MONTH[period];
     const month = '2026-' + period.replace('월', '').padStart(2, '0');
     const groups = ALL_GROUP_IDS.map(groupId => {
       const { people, months } = byGroup.get(groupId) || { people: 0, months: {} };
@@ -80,6 +101,7 @@ function buildRankings(rows) {
   }
   return rankings;
 }
+
 
 // ── 조별 체크판 잠금 설정 캐시(서버 메모리) ──
 // check/uncheck마다 group_settings를 읽으면 쓰기 경로가 2쿼리 → 3쿼리가 된다.
@@ -120,13 +142,11 @@ export default async function handler(req, res) {
   const { groupId, global, allGroups, month } = req.query;
 
   try {
-    // 운영자 전용 순위 조회. 기존 공개 allGroups 집계와 분리.
+    // 기존 운영자 링크와 동일한 오진입 방지 게이트. 실제 서버 인증은 아님.
     if (req.query.ranking === 'true') {
       res.setHeader('Cache-Control', 'no-store');
-      if (req.method !== 'POST') return res.status(405).json({ error: 'POST만 지원합니다.' });
-      const secret = process.env.ADMIN_RANKING_KEY;
-      if (!secret) return res.status(503).json({ error: '순위 조회 비밀번호가 설정되지 않았습니다.' });
-      if (req.body?.key !== secret) return res.status(403).json({ error: '순위 조회 비밀번호가 일치하지 않습니다.' });
+      if (req.method !== 'GET') return res.status(405).json({ error: 'GET만 지원합니다.' });
+      if (req.query.admin !== 'bbf-admin-2026') return res.status(403).json({ error: '운영자 모드에서 조회해 주세요.' });
       if (rankingCache && Date.now() - rankingCache.at < AGG_CACHE_TTL_MS) {
         return res.status(200).json(rankingCache.data);
       }
@@ -135,7 +155,7 @@ export default async function handler(req, res) {
           SELECT group_id, COUNT(*)::int AS people
           FROM group_members GROUP BY group_id
         ), checks AS (
-          SELECT tl.group_id, LEFT(tl.check_date, 7) AS month, COUNT(*)::int AS checked
+          SELECT tl.group_id, LEFT(tl.check_date, 7) AS month, COUNT(DISTINCT (tl.member_name, tl.check_date))::int AS checked
           FROM tongdok_logs tl
           WHERE tl.check_date = ANY(${rankingDates}::text[])
             AND EXISTS (
@@ -151,6 +171,7 @@ export default async function handler(req, res) {
       rankingCache = { at: Date.now(), data };
       return res.status(200).json(data);
     }
+
 
     // 1. 전체 진도율 집계 (이달의 명화 / 150일 대장정용)
     //    - month('2026-08' 형식)가 있으면 그 달의 로그만, 없으면 전체(150일)를 실제로 COUNT.
@@ -267,7 +288,14 @@ export default async function handler(req, res) {
           ? Math.min((groupCurrentChecked / groupTargetGoal) * 100, 100)
           : 0;
 
-        return { groupId: gid, percent: Number(percent.toFixed(1)) };
+        const row = { groupId: gid, percent: Number(percent.toFixed(1)) };
+        // 11월 집계에만 최종 통독률 추가. 기존에 읽은 전체 로그 재사용 → 추가 DB 쿼리 없음.
+        if (month === '2026-11') {
+          const counts = getFinalReadingCounts(groupMembers, groupLogs);
+          const checked = Array.from(counts.values()).reduce((sum, count) => sum + count, 0);
+          row.finalPercent = getFinalPercent(checked, groupMembers.length * TOTAL_150_DAYS);
+        }
+        return row;
       });
 
       const payload = { groups };
